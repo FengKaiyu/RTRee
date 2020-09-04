@@ -1,0 +1,239 @@
+//
+// Created by Kaiyu on 2020/7/25.
+//
+
+#ifndef RTREE_RTREE_H
+#define RTREE_RTREE_H
+#include<list>
+#include<vector>
+#include<algorithm>
+#include<cfloat>
+#include<cmath>
+#include<assert.h>
+#include<iostream>
+
+using std::list;
+using std::vector;
+using std::pair;
+using std::make_pair;
+using std::min;
+using std::max;
+using std::abs;
+using std::sort;
+using std::cout;
+using std::ceil;
+using std::endl;
+
+
+
+enum INSERT_STRATEGY{
+    INS_AREA, INS_MARGIN, INS_OVERLAP, INS_RANDOM
+};
+enum SPLIT_STRATEGY{
+    SPL_MIN_AREA, SPL_MIN_MARGIN, SPL_MIN_OVERLAP, SPL_QUADRATIC, SPL_GREENE
+};
+
+enum TYPE {
+	REC, TREE_NODE
+};
+
+struct Point{
+public:
+    double x;
+    double y;
+public:
+    double get_left(){return x;};
+    double get_right(){return x;};
+    double get_bottom(){return y;};
+    double get_top(){return y;};
+};
+
+class Rectangle{
+public:
+    double left_;
+    double right_;
+    double bottom_;
+    double top_;
+
+	unsigned int id_;
+
+public:
+    Rectangle(){};
+	Rectangle(const Rectangle& rectangle);
+	Rectangle(double l, double r, double b, double t) :left_(l), right_(r), top_(t), bottom_(b) {};
+
+	double Left() const { return left_; };
+	double Right() const { return right_; };
+	double Top() const { return top_; };
+	double Bottom() const { return bottom_; };
+	double Area() const { return (top_ - bottom_) * (right_ - left_); };
+	double Perimeter() const { return 2 * (top_ - bottom_ + right_ - left_); };
+
+
+	bool Contains(Rectangle* rec);
+	bool IsOverlap(Rectangle* rec);
+
+    void Set(const Rectangle& rectangle);
+    void Include(const Rectangle& rectangle);
+	Rectangle Merge(const Rectangle& rectangle);
+};
+
+
+//Rectangle Merge(const Rectangle& rectangle1, const Rectangle& rectangle2);
+//double Overlap(const Rectangle& rectangle1, const Rectangle& rectangle2);
+
+
+//template<class T>
+//double SplitArea(T* t1, T* t2);
+//
+//template<class T>
+//double SplitOverlap(T* t1, T* t2);
+//
+//template<class T> 
+//double SplitPerimeter(T* t1, T* t2);
+
+double SplitArea(const Rectangle& rectangle1, const Rectangle& rectangle2);
+double SplitOverlap(const Rectangle& rectangle1, const Rectangle& rectangle2);
+double SplitPerimeter(const Rectangle& rectangle1, const Rectangle& rectangle2);
+
+
+
+
+bool IsContained(const Rectangle& rectangle1, const Rectangle& rectangle2);
+bool IsOverlapped(const Rectangle& rectangle1, const Rectangle& rectangle2);
+
+class TreeNode : public Rectangle{
+public:
+    int father;
+    //vector<TreeNode*> children;
+	vector<int> children;
+
+    int entry_num;
+    bool is_overflow;
+	bool is_leaf;
+
+    static int maximum_entry;
+    static int minimum_entry;
+
+public:
+    TreeNode();
+	TreeNode(TreeNode* node);
+    bool CopyChildren(const vector<TreeNode*>& nodes);
+	bool CopyChildren(const vector<int>& node_ids);
+    bool AddChildren(TreeNode* node);
+	bool AddChildren(int node_id);
+};
+
+
+template<class T>
+Rectangle MergeRange(const vector<T*>& entries, const int start_idx, const int end_idx);
+
+
+template<class T>
+int FindMinimumSplit(const vector<T*>& entries, double(*score_func1)(const Rectangle &, const Rectangle &),
+	double(*score_func2)(const Rectangle &, const Rectangle &), double& min_value1, double& min_value2, Rectangle& rec1, Rectangle& rec2);
+
+struct Stats {
+	int node_access;
+	int action_history[5];
+	void Reset(); 
+	void TakeAction(int action);
+};
+
+class RTree {
+public:
+    //list<TreeNode*> tree_nodes_;
+	//list<Rectangle*> objects_;
+	vector<TreeNode*> tree_nodes_;
+	vector<Rectangle*> objects_;
+    int root_;
+
+    //parameters
+    INSERT_STRATEGY insert_strategy_;
+    SPLIT_STRATEGY split_strategy_;
+
+	Stats stats_;
+
+
+
+public:
+
+	RTree();
+
+
+	void Copy(RTree* tree);
+	TreeNode* Root();
+	Rectangle* InsertRectangle(double left, double right, double bottom, double top);
+
+    TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node, INSERT_STRATEGY strategy);
+    TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node);
+	
+
+    TreeNode* SplitStepByStep(TreeNode* tree_node, SPLIT_STRATEGY strategy);
+    TreeNode* SplitStepByStep(TreeNode* tree_node);
+
+    //Rectangle MergeRectangleList(const vector<pair<double, Rectangle> >& rectangle_list, double min_value);
+
+    //void FindMinimumSplit(const vector<TreeNode*>& entries, double(*score_func1)(const Rectangle &, const Rectangle &),
+            //double(*score_func2)(const Rectangle &, const Rectangle &), double& value1, double& value2, vector<TreeNode*>& child1, vector<TreeNode*>& child2);
+	//void FindMinimumSplit(const vector<Rectangle*> &entries, double(*score_func1)(const Rectangle &, const Rectangle &),
+		//double(*score_func2)(const Rectangle &, const Rectangle &), double &min_value1, double &min_value2, vector<Rectangle>& child1, vector<Rectangle>& child2);
+
+	//void FindMinimumSplit(void* entries, double(*score_func1)(const Rectangle &, const Rectangle &),
+		//double(*score_func2)(const Rectangle &, const Rectangle &), double& value1, double& value2, int& split_loc);
+	
+	//Rectangle MergeRange(const vector<TreeNode*>& entries, const int start_idx, const int end_idx);
+	//Rectangle MergeRange(const vector<Rectangle*>& entries, const int start_idx, const int end_idx);
+    TreeNode* CreateNode();
+
+
+	int Query(Rectangle& rectangle);
+	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
+	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
+	void SplitOVERLAPCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
+	void SplitGREENECost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
+	void SplitQUADRATICCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
+
+	void Print();
+};
+
+
+
+
+extern "C"{
+
+	int RetrieveStates(RTree* tree, TreeNode* tree_node, double* states);
+
+	RTree* ConstructTree(int max_entry, int min_entry);
+
+	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
+	void SetDefaultSplitStrategy(RTree* rtree, int strategy);
+	int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top);
+	
+	TreeNode* GetRoot(RTree* rtree);
+
+	void CopyTree(RTree* tree, RTree* from_tree);
+
+	Rectangle* InsertRec(RTree* rtree, double left, double right, double bottom, double top);
+	TreeNode* InsertOneStep(RTree* rtree, Rectangle* rec, TreeNode* node, int strategy);
+
+	TreeNode* DirectInsert(RTree* rtree, Rectangle* rec);
+	void DirectSplit(RTree* rtree, TreeNode* node);
+
+	void DefaultInsert(RTree* rtree, Rectangle* rec);
+
+	TreeNode* SplitOneStep(RTree* rtree, TreeNode* node, int strategy);
+	int IsLeaf(TreeNode* node);
+	int IsOverflow(TreeNode* node);
+
+	void GetMBR(RTree* rtree, double* boundary);
+
+	void PrintTree(RTree* rtree);
+
+	int TotalTreeNode(RTree* rtree);
+
+	void Clear(RTree* rtree);
+}
+
+
+#endif //RTREE_RTREE_H
