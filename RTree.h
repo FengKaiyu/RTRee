@@ -147,6 +147,8 @@ public:
 	vector<TreeNode*> tree_nodes_;
 	vector<Rectangle*> objects_;
     int root_;
+	int height_;
+	list<int> history;
 
     //parameters
     INSERT_STRATEGY insert_strategy_;
@@ -167,6 +169,10 @@ public:
 
     TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node, INSERT_STRATEGY strategy);
     TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node);
+
+	TreeNode* TryInsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node);
+
+	void Recover(RTree* rtree);
 	
 
     TreeNode* SplitStepByStep(TreeNode* tree_node, SPLIT_STRATEGY strategy);
@@ -220,7 +226,11 @@ extern "C"{
 	TreeNode* DirectInsert(RTree* rtree, Rectangle* rec);
 	void DirectSplit(RTree* rtree, TreeNode* node);
 
+	int TryInsert(RTree* rtree, Rectangle* rec);
+
 	void DefaultInsert(RTree* rtree, Rectangle* rec);
+
+	void DefaultInsertWithHistory(RTree* rtree, Rectangle* rec);
 
 	TreeNode* SplitOneStep(RTree* rtree, TreeNode* node, int strategy);
 	int IsLeaf(TreeNode* node);
@@ -231,6 +241,7 @@ extern "C"{
 	void PrintTree(RTree* rtree);
 
 	int TotalTreeNode(RTree* rtree);
+	int TreeHeight(RTree* rtree);
 
 	void Clear(RTree* rtree);
 }

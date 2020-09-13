@@ -408,12 +408,26 @@ int FindMinimumSplit(const vector<T*>& entries, double(*score_func1)(const Recta
 
 RTree::RTree() {
 	TreeNode* root = CreateNode();
+	height_ = 1;
 	root->is_leaf = true;
 	root_ = 0;
 }
 
 TreeNode* RTree::Root() {
 	return tree_nodes_[root_];
+}
+
+void RTree::Recover(RTree* rtree) {
+	for (auto it = history.begin(); it != history.end(); ++it) {
+		int node_id = *it;
+		tree_nodes_[node_id]->Set(*(rtree->tree_nodes_[node_id]));
+		tree_nodes_[node_id]->entry_num = rtree->tree_nodes_[node_id]->entry_num;
+		for (int i = 0; i < tree_nodes_[node_id]->entry_num; i++) {
+			tree_nodes_[node_id]->children[i] = rtree->tree_nodes_[node_id]->children[i];
+			int child = tree_nodes_[node_id]->children[i];
+			tree_nodes_[child]->father = node_id;
+		}
+	}
 }
 
 TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
@@ -1090,6 +1104,7 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 			root_ = new_root->id_;
 			tree_node->father = new_root->id_;
 			sibling->father = new_root->id_;
+			height_ += 1;
 		}
 		next_node = tree_nodes_[tree_node->father];
 	}
@@ -1139,6 +1154,89 @@ TreeNode* RTree::CreateNode() {
 	return node;
 }
 
+
+TreeNode* RTree::TryInsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node) {
+	TreeNode* next_node = nullptr;
+	if (!tree_node->is_leaf) {
+		switch (insert_strategy_) {
+		case INS_AREA: {
+			double min_area_increase = DBL_MAX;
+			for (int idx = 0; idx < tree_node->entry_num; idx++) {
+				TreeNode* it = tree_nodes_[tree_node->children[idx]];
+				Rectangle new_rectangle = it->Merge(*rectangle);
+				double area_increase = new_rectangle.Area() - it->Area();
+				if (area_increase < min_area_increase) {
+					//choose the subtree with the smaller area increase
+					min_area_increase = area_increase;
+					next_node = it;
+				}
+				else if (area_increase == min_area_increase) {
+					//break the tie by favoring the smaller MBR
+					if (next_node->Area() > it->Area()) {
+						next_node = it;
+					}
+				}
+			}
+			break;
+		}
+		case INS_MARGIN: {
+			double min_margin_increase = DBL_MAX;
+			for (int idx = 0; idx < tree_node->entry_num; idx++) {
+				TreeNode* it = tree_nodes_[tree_node->children[idx]];
+				Rectangle new_rectangle = it->Merge(*rectangle);
+				double margin_increase = new_rectangle.Perimeter() - it->Perimeter();
+				if (margin_increase < min_margin_increase) {
+					//choose the subtree with smaller perimeter increase
+					next_node = it;
+					min_margin_increase = margin_increase;
+				}
+				else if (margin_increase == min_margin_increase) {
+					//break the tie by favoring the smaller MBR
+					if (next_node->Area() > it->Area()) {
+						next_node = it;
+					}
+				}
+			}
+			break;
+		}
+		case INS_OVERLAP: {
+			double min_overlap_increase = DBL_MAX;
+			for (int idx = 0; idx < tree_node->entry_num; idx++) {
+				TreeNode* it = tree_nodes_[tree_node->children[idx]];
+				Rectangle new_rectangle = it->Merge(*rectangle);
+				double overlap_increase = 0;
+				for (int idx2 = 0; idx2 < tree_node->entry_num; idx2++) {
+					if (idx == idx2)continue;
+					TreeNode* it2 = tree_nodes_[tree_node->children[idx2]];
+					//overlap_increase += Overlap(new_rectangle, it2->bounding_box) - Overlap(it->bounding_box, it2->bounding_box);
+					overlap_increase += SplitOverlap(new_rectangle, *it2) - SplitOverlap(*it, *it2);
+				}
+				if (overlap_increase < min_overlap_increase) {
+					//choose the subtree with smaller overlap increase
+					min_overlap_increase = overlap_increase;
+					next_node = it;
+				}
+				else if (overlap_increase == min_overlap_increase) {
+					//break the tie by favoring the one with smaller area increase
+					//double area_increase = Area(Merge(rectangle, it->bounding_box)) - Area(it->bounding_box);
+					double area_increase = it->Merge(*rectangle).Area() - it->Area();
+					if (area_increase < next_node->Merge(*rectangle).Area() - next_node->Area()) {
+						next_node = it;
+					}
+
+				}
+			}
+			break;
+		}
+		case INS_RANDOM: {
+			int chosen_child = rand() % tree_node->entry_num;
+			next_node = tree_nodes_[tree_node->children[chosen_child]];
+			break;
+		}
+		}
+	}
+	return next_node;
+}
 
 TreeNode* RTree::InsertStepByStep(const Rectangle *rectangle, TreeNode *tree_node, INSERT_STRATEGY strategy) {
 	TreeNode* next_node = nullptr;
@@ -1225,6 +1323,8 @@ TreeNode* RTree::InsertStepByStep(const Rectangle *rectangle, TreeNode *tree_nod
 			break;
 		}
 		case INS_RANDOM: {
+			int chosen_child = rand() % tree_node->entry_num;
+			next_node = tree_nodes_[tree_node->children[chosen_child]];
 			break;
 		}
 		}
@@ -2026,6 +2126,36 @@ void DirectSplit(RTree* rtree, TreeNode* node) {
 	}
 }
 
+int TryInsert(RTree* rtree, Rectangle* rec) {
+	TreeNode* iter = rtree->Root();
+	while (true) {
+		TreeNode* next_iter = rtree->TryInsertStepByStep(rec, iter);
+		if (next_iter != nullptr) {
+			iter = next_iter;
+		}
+		else {
+			if (iter->entry_num < TreeNode::maximum_entry) {
+				if (iter->entry_num == 0) {
+					iter->Set(*rec);
+				}
+				else {
+					iter->Include(*rec);
+				}
+				iter->AddChildren(rec->id_);
+				while (iter->father >= 0) {
+					next_iter = rtree->tree_nodes_[iter->father];
+					next_iter->Include(*rec);
+					iter = next_iter;
+				}
+				return 1;
+			}
+			else {
+				return 0;
+			}
+		}
+	}
+}
+
 void DefaultInsert(RTree* rtree, Rectangle* rec) {
 	TreeNode* iter = rtree->Root();
 	
@@ -2047,6 +2177,10 @@ int TotalTreeNode(RTree* rtree) {
 	return (int)rtree->tree_nodes_.size();
 }
 
+int TreeHeight(RTree* rtree){
+	return rtree->height_;
+}
+
 void Clear(RTree* rtree) {
 	for(int i=0; i<rtree->objects_.size(); i++){
 		delete rtree->objects_[i];
@@ -2054,6 +2188,7 @@ void Clear(RTree* rtree) {
 	for(int i=0; i<rtree->tree_nodes_.size(); i++){
 		delete rtree->tree_nodes_[i];
 	}
+	rtree->height_ = 1;
 	rtree->tree_nodes_.clear();
 	rtree->objects_.clear();
 	rtree->root_ = rtree->CreateNode()->id_;
@@ -2061,6 +2196,12 @@ void Clear(RTree* rtree) {
 }
 
 void RTree::Copy(RTree* tree) {
+	for (int i = 0; i < objects_.size(); i++) {
+		delete objects_[i];
+	}
+	for (int i = 0; i < tree_nodes_.size(); i++) {
+		delete tree_nodes_[i];
+	}
 	objects_.resize(tree->objects_.size());
 	tree_nodes_.resize(tree->tree_nodes_.size());
 	for (int i = 0; i < objects_.size(); i++) {
@@ -2068,6 +2209,7 @@ void RTree::Copy(RTree* tree) {
 		objects_[i]->id_ = tree->objects_[i]->id_;
 		assert(objects_[i]->id_ == i);
 	}
+	height_ = tree->height_;
 	for (int i = 0; i < tree_nodes_.size(); i++) {
 		tree_nodes_[i] = new TreeNode(tree->tree_nodes_[i]);
 		assert(tree_nodes_[i]->id_ == i);

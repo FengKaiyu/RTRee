@@ -65,6 +65,12 @@ class RTree:
 		self.lib.CopyTree.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.CopyTree.restype = ctypes.c_void_p
 
+		self.lib.TryInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.TryInsert.restype = ctypes.c_int
+
+		self.lib.TreeHeight.argtypes = [ctypes.c_void_p]
+		self.lib.TreeHeight.restype = ctypes.c_int
+
 		self.tree = self.lib.ConstructTree(max_entry, min_entry)
 		self.strategy_map = {"INS_AREA":0, "INS_MARGIN":1, "INS_OVERLAP":2, "INS_RANDOM":3, "SPL_MIN_AREA":0, "SPL_MIN_MARGIN":1, "SPL_MIN_OVERLAP":2, "SPL_QUADRATIC":3, "SPL_GREENE":4}
 
@@ -140,8 +146,13 @@ class RTree:
 
 	def AccessRate(self, boundary):
 		node_access = self.lib.QueryRectangle(self.tree, boundary[0], boundary[1], boundary[2], boundary[3])
-		total_node = self.lib.TotalTreeNode(self.tree)
-		return 1.0 * node_access / total_node
+		#total_node = self.lib.TotalTreeNode(self.tree)
+		#print('node_access', node_access)
+		height = self.lib.TreeHeight(self.tree)
+		if height == 0:
+			print('height is 0')
+			input()
+		return 1.0 * node_access / height #total_node
 
 
 	def DefaultInsert(self, boundary):
@@ -151,6 +162,14 @@ class RTree:
 
 	def CopyTree(self, tree):
 		self.lib.CopyTree(self.tree, tree)
+
+	def TryInsert(self, boundary):
+		self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
+		is_success = self.lib.TryInsert(self.tree, self.rec)
+		if is_success == 0:
+			return False
+		else:
+			return True
 
 
 	def InsertOneStep(self, strategy_id):
