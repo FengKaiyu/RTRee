@@ -31,6 +31,9 @@ class RTree:
 		self.lib.SplitOneStep.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
 		self.lib.SplitOneStep.restype = ctypes.c_void_p
 
+		self.lib.SplitWithLoc.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+		self.lib.SplitWithLoc.restype = ctypes.c_void_p
+
 		self.lib.IsLeaf.argtypes = [ctypes.c_void_p]
 		self.lib.IsLeaf.restype = ctypes.c_int
 
@@ -40,12 +43,17 @@ class RTree:
 		self.lib.RetrieveStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveStates.restype = ctypes.c_int
 
+		self.lib.RetrieveSpecialStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSpecialStates.restype = ctypes.c_void_p
 
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
 
 		self.lib.PrintTree.argtypes = [ctypes.c_void_p]
 		self.lib.PrintTree.restype = ctypes.c_void_p
+
+		self.lib.PrintEntryNum.argtypes = [ctypes.c_void_p]
+		self.lib.PrintEntryNum.restype = ctypes.c_void_p
 
 		self.lib.DefaultInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.DefaultInsert.restype = ctypes.c_void_p
@@ -71,11 +79,19 @@ class RTree:
 		self.lib.TreeHeight.argtypes = [ctypes.c_void_p]
 		self.lib.TreeHeight.restype = ctypes.c_int
 
+		self.lib.SetDebug.argtypes = [ctypes.c_void_p, ctypes.c_int]
+		self.lib.SetDebug.restype = ctypes.c_void_p
+
+		self.lib.GetQueryResult.argtypes = [ctypes.c_void_p]
+		self.lib.GetQueryResult.restype = ctypes.c_int
+
 		self.tree = self.lib.ConstructTree(max_entry, min_entry)
 		self.strategy_map = {"INS_AREA":0, "INS_MARGIN":1, "INS_OVERLAP":2, "INS_RANDOM":3, "SPL_MIN_AREA":0, "SPL_MIN_MARGIN":1, "SPL_MIN_OVERLAP":2, "SPL_QUADRATIC":3, "SPL_GREENE":4}
 
 		self.insert_strategy = None
 		self.split_strategy = None
+
+		self.debug = False
 
 	def RandomQuery(self, width, height):
 		boundary_c = (ctypes.c_double * 4)()
@@ -109,7 +125,13 @@ class RTree:
 		self.ptr = self.lib.GetRoot(self.tree)
 
 	def RetrieveSplitStates(self):
+		#if self.debug:
+		#	self.lib.SetDebug(self.tree, 1)
+		#else:
+		#	self.lib.SetDebug(self.tree, 0)
 		is_overflow = self.lib.IsOverflow(self.ptr)
+		#if self.debug:
+		#	print(is_overflow)
 		if is_overflow == 0:
 			return None, False
 		state_length = 25
@@ -117,6 +139,17 @@ class RTree:
 		is_valid = self.lib.RetrieveStates(self.tree, self.ptr, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states, is_valid
+
+	def RetrieveSpecialSplitStates(self):
+
+		is_overflow = self.lib.IsOverflow(self.ptr)
+		if is_overflow == 0:
+			return None
+		state_length = 5 * 12 * 4
+		state_c	 = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSpecialStates(self.tree, self.ptr, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
 
 
 	def UniformRandomQuery(self, wr, hr):
@@ -143,6 +176,8 @@ class RTree:
 	def Query(self, boundary):
 		node_access = self.lib.QueryRectangle(self.tree, boundary[0], boundary[1], boundary[2], boundary[3])
 		return node_access
+	def QueryResult(self):
+		return self.lib.GetQueryResult(self.tree)
 
 	def AccessRate(self, boundary):
 		node_access = self.lib.QueryRectangle(self.tree, boundary[0], boundary[1], boundary[2], boundary[3])
@@ -188,11 +223,23 @@ class RTree:
 		else:
 			return True
 
+
+	def SplitWithLoc(self, loc):
+		if self.lib.IsOverflow(self.ptr):
+			self.next_ptr = self.lib.SplitWithLoc(self.tree, self.ptr, loc)
+			self.ptr = self.next_ptr
+			return False
+		else: 
+			return True
+
 	def Clear(self):
 		self.lib.Clear(self.tree)
 
 	def Print(self):
 		self.lib.PrintTree(self.tree)
+
+	def PrintEntryNum(self):
+		self.lib.PrintEntryNum(self.tree);
 
 	def DirectInsert(self, boundary):
 		self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])

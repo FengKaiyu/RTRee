@@ -5,6 +5,8 @@ import torch.nn.functional as f
 import torch.multiprocessing as mp
 import torch.optim as optim
 
+import hashlib
+
 import random
 import math
 import argparse
@@ -19,7 +21,7 @@ from RTree import RTree
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-action', choices=['train', 'test', 'baseline'])
+parser.add_argument('-action', choices=['train', 'test', 'test10', 'baseline'])
 parser.add_argument('-objfile', help='data file')
 parser.add_argument('-queryfile', help='query file')
 parser.add_argument('-epoch', type=int, help='number of epoches', default=1)
@@ -43,7 +45,9 @@ parser.add_argument('-epsilon_decay', type=float, help='how fast to decrease eps
 parser.add_argument('-min_epsilon', type=float, help='minimum epsilon', default=0.1)
 parser.add_argument('-max_entry', type=int, help='maximum entry a node can hold', default=50)
 parser.add_argument('-query_for_reward', type=int, help='number of query used for reward', default=5)
-parser.add_argument('-splits_for_update', type=int, help='number of splits for a reward computation', default=10)
+parser.add_argument('-splits_for_update', type=int, help='number of splits for a reward computation', default=20)
+parser.add_argument('-parts', type=int, help='number of parts to train', default=5)
+parser.add_argument('-network', choices=['strategy', 'spl_loc'], help='which network is used for training', default='strategy')
 
 class DQN(nn.Module):
 	def __init__(self, input_dimension, inter_dimension, output_dimension):
@@ -57,6 +61,19 @@ class DQN(nn.Module):
 		x = m(x)
 		x = self.linear2(x)
 		#sf = nn.Softmax(dim=0)
+		return x
+
+class DQN2(nn.Module):
+	def __init__(self, input_dimension=240, inter_dimension=300, output_dimension=48):
+		super(DQN2, self).__init__()
+		self.linear1 = nn.Linear(input_dimension, inter_dimension)
+		self.linear2 = nn.Linear(inter_dimension, output_dimension)
+
+	def forward(self, x):
+		m = nn.SELU()
+		x = self.linear1(x)
+		x = m(x)
+		x = self.linear2(x)
 		return x
 
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state'))
@@ -93,13 +110,21 @@ class SplitLearner:
 		self.obj_input = None
 		self.query_input = None
 		self.config = None
+		md5content = "{}".format(datetime.now())
+		self.id = hashlib.md5(md5content.encode()).hexdigest()
 
 	def Initialize(self, config):
 		self.config = config
 		if config.objfile:
-			self.obj_input = open(config.objfile, 'r')
+			try:
+				self.obj_input = open(config.objfile, 'r')
+			except:
+				print('object file does not exist.')
 		if config.queryfile:
-			self.query_input = open(config.queryfile, 'r')
+			try:
+				self.query_input = open(config.queryfile, 'r')
+			except:
+				print('query file does not exist.')
 
 		self.tree = RTree(self.config.max_entry, int(0.4 * self.config.max_entry))
 		self.tree.SetInsertStrategy(config.default_ins_strategy)
@@ -108,8 +133,12 @@ class SplitLearner:
 		self.reference_tree.SetInsertStrategy(config.reference_tree_ins_strategy)
 		self.reference_tree.SetSplitStrategy(config.reference_tree_spl_strategy)
 
-		self.network = DQN(self.config.state_dim, self.config.inter_dim, self.config.action_space)
-		self.target_network = DQN(self.config.state_dim, self.config.inter_dim, self.config.action_space)
+		if self.config.network == 'strategy':
+			self.network = DQN(self.config.state_dim, self.config.inter_dim, self.config.action_space)
+			self.target_network = DQN(self.config.state_dim, self.config.inter_dim, self.config.action_space)
+		if self.config.network == 'spl_loc':
+			self.network = DQN2()
+			self.target_network = DQN2()
 
 		self.target_network.load_state_dict(self.network.state_dict())
 		self.target_network.eval()
@@ -135,6 +164,9 @@ class SplitLearner:
 			return None
 		boundary = [float(e) for e in line.strip().split()]
 		return boundary
+
+	def ResetQueryLoader(self):
+		self.query_input.seek(0)
 
 	def EpsilonGreedy(self, q_values):
 		p = random.random()
@@ -213,21 +245,118 @@ class SplitLearner:
 		return access_rate_avg / self.config.query_for_reward
 
 
+	def Test10(self):
+		self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
+		self.network.eval()
+		node_access = 0
+		query_num = 0
+		for i in range(10):
+			self.tree.Clear()
+			name = "./dataset/{}.test{}.txt".format(self.config.objfile, i)
+			ofin = open(name, 'r')
+			for line in ofin:
+				object_boundary = [float(e) for e in line.strip().split()]
+				self.tree.DirectInsert(object_boundary)
+				states, _ = self.tree.RetrieveSplitStates()
+				while states is not None:
+					states = torch.tensor(states, dtype=torch.float32)
+					q_values = self.network(states)
+					action = torch.argmax(q_values).item()
+					self.tree.SplitOneStep(action)
+					states, _ = self.tree.RetrieveSplitStates()
+			ofin.close()
+			query = self.NextQuery()
+			while query is not None:
+				node_access += self.tree.Query(query)
+				query_num += 1
+				query = self.NextQuery()
+			self.ResetQueryLoader()
+		print('average node access is ', node_access / query_num)
+
+	def Test10_2(self):
+		self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
+		self.network.eval()
+		node_access = 0
+		query_num = 0
+		for i in range(10):
+			self.tree.Clear()
+			name = "./dataset/{}.test{}.txt".format(self.config.objfile, i)
+			ofin = open(name, 'r')
+			for line in ofin:
+				object_boundary = [float(e) for e in line.strip().split()]
+				self.tree.DirectInsert(object_boundary)
+				states = self.tree.RetrieveSpecialSplitStates()
+				while states is not None:
+					states = torch.tensor(states, dtype=torch.float32)
+					q_values = self.network(states)
+					action = torch.argmax(q_values).item()
+					self.tree.SplitWithLoc(action)
+					states = self.tree.RetrieveSpecialSplitStates()
+			ofin.close()
+			query = self.NextQuery()
+			while query is not None:
+				node_access += self.tree.Query(query)
+				query_num += 1
+				query = self.NextQuery()
+			self.ResetQueryLoader()
+		print('average node access is ', node_access / query_num)
+
+	def Test2(self):
+		self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
+		self.network.eval()
+		self.ResetObjLoader()
+		self.tree.Clear()
+		object_boundary = self.NextObj()
+		obj_cnt = 0
+		while object_boundary is not None:
+			obj_cnt += 1
+			self.tree.DirectInsert(object_boundary)
+			states = self.tree.RetrieveSpecialSplitStates()
+			while states is not None:
+				states = torch.tensor(states, dtype=torch.float32)
+				q_values = self.network(states)
+				action = torch.argmax(q_values).item()
+				self.tree.SplitWithLoc(action)
+				states = self.tree.RetrieveSpecialSplitStates()
+			object_boundary = self.NextObj()
+		#self.tree.PrintEntryNum()
+		node_access = 0
+		query_num = 0
+		query = self.NextQuery()
+		f = open('debug.result.log', 'w')
+		while query is not None:
+			node_access += self.tree.Query(query)
+			f.write('{}\n'.format(self.tree.QueryResult()))
+			query_num += 1
+			query = self.NextQuery()
+		print('average node access is ', node_access / query_num)
+		f.close()
+		return 1.0 * node_access / query_num
+
 	def Test(self):
 		self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
 		self.network.eval()
 		self.ResetObjLoader()
 		self.tree.Clear()
-
+		debug = False
 		object_boundary = self.NextObj()
 		obj_cnt = 0
+		self.tree.debug = False
 		while object_boundary is not None:
 			obj_cnt += 1
-			if obj_cnt % 100 == 0:
-				print(obj_cnt)
+			#if obj_cnt > 92300:
+				#debug = True
+			#if obj_cnt % 100 == 0:
+				#print(obj_cnt)
+			if debug:
+				print('to insert', obj_cnt)
 			self.tree.DirectInsert(object_boundary)
+			if debug:
+				print('inserted', obj_cnt)
 			#print('insert')
 			states, _ = self.tree.RetrieveSplitStates()
+			#if debug:
+			#print(states)
 			while states is not None:
 				states = torch.tensor(states, dtype=torch.float32)
 				#print('states', states)
@@ -238,18 +367,26 @@ class SplitLearner:
 				action = torch.argmax(q_values).item()
 				#print('action', action)
 				#input()
+				#if(debug):
+				#print("to split")
 				self.tree.SplitOneStep(action)
+				#if(debug):
+				#	print('splitted')
 				states, _ = self.tree.RetrieveSplitStates()
 			object_boundary = self.NextObj()
+		self.tree.PrintEntryNum()
 
 		node_access = 0
 		query_num = 0
 		query = self.NextQuery()
+		f = open('debug.result.log', 'w')
 		while query is not None:
 			node_access += self.tree.Query(query)
+			f.write('{}\n'.format(self.tree.QueryResult()))
 			query_num += 1
 			query = self.NextQuery()
 		print('average node access is ', node_access / query_num)
+		f.close()
 		return 1.0 * node_access / query_num
 
 	def Baseline(self):
@@ -268,6 +405,124 @@ class SplitLearner:
 			query = self.NextQuery()
 		return 1.0 * node_access / query_num
 
+	def Train4(self):
+		start_time = time.time()
+		loss_log = open("./log/{}.loss".format(self.id), 'w')
+		reward_log = open("./log/{}.reward".format(self.id), "w")
+		steps = []
+		object_num = 0
+		self.ResetObjLoader()
+		object_boundary = self.NextObj()
+		cache_tree = RTree(self.config.max_entry, int(0.4 * self.config.max_entry))
+		cache_tree.SetInsertStrategy(self.config.default_ins_strategy)
+		cache_tree.SetSplitStrategy(self.config.default_spl_strategy)
+
+		while object_boundary is not None:
+			object_num += 1
+			object_boundary = self.NextObj()
+		objects_for_train = 0
+		for epoch in range(self.config.epoch):
+			e = 0
+			self.ResetObjLoader()
+			self.tree.Clear()
+			self.reference_tree.Clear()
+			print("setup initial tree")
+			ratio_for_tree_construction = epoch % self.config.parts + 1
+			for i in range(int(object_num * ratio_for_tree_construction / (self.config.parts + 1))):
+				object_boundary = self.NextObj()
+				self.tree.DefaultInsert(object_boundary)
+			fo = open('train_object.tmp', 'w')
+			object_boundary = self.NextObj()
+
+			print('filling leaf nodes')
+			#fill the r-tree so every leaf is full
+			objects_for_fill = 0
+			cnt = 0
+			while object_boundary is not None:
+				if cnt % 100 == 0:
+					print(cnt)
+				cnt += 1
+				is_success = self.tree.TryInsert(object_boundary)
+				if not is_success:
+					fo.write('{:.5f} {:.5f} {:.5f} {:.5f}\n'.format(object_boundary[0], object_boundary[1], object_boundary[2], object_boundary[3]))
+				else:
+					objects_for_fill += 1
+				object_boundary = self.NextObj()
+			fo.close()
+			cache_tree.CopyTree(self.tree.tree)
+			self.reference_tree.CopyTree(cache_tree.tree)
+			self.tree.CopyTree(cache_tree.tree)
+
+
+			fin = open('train_object.tmp', 'r')
+			period = 0
+			obj_list_for_reward = []
+			for line in fin:
+				objects_for_train += 1
+				object_boundary = [float(v) for v in line.strip().split()]
+				#print('object', object_boundary)
+				self.reference_tree.DefaultInsert(object_boundary)
+				self.tree.DirectInsert(object_boundary)
+				states = self.tree.RetrieveSpecialSplitStates()
+				triggered = False
+				while states is not None:
+					triggered = True
+					states = torch.tensor(states, dtype=torch.float32)
+					with torch.no_grad():
+						q_values = self.network(states)
+						action = self.EpsilonGreedy(q_values)
+						self.tree.SplitWithLoc(action)
+						steps.append((states, action))
+						states = self.tree.RetrieveSpecialSplitStates()
+
+
+				if triggered:
+					steps.append((None, None))
+				period += 1
+				obj_list_for_reward.append(object_boundary)
+
+				if period == self.config.splits_for_update:
+					reward = self.ComputeDenseRewardForList(obj_list_for_reward)
+					#print('reward', reward)
+					reward_log.write('{}\n'.format(reward))
+					for i in range(len(steps) - 1):
+						if steps[i][1] is None:
+							continue
+						self.memory.push(steps[i][0], steps[i][1], torch.tensor([reward]), steps[i+1][0])
+					self.reference_tree.CopyTree(cache_tree.tree)
+					self.tree.CopyTree(cache_tree.tree)
+					period = 0
+					obj_list_for_reward.clear()
+					steps.clear()
+
+
+				l = self.Optimize()
+				loss_log.write('{}\n'.format(l))
+				if e % 500 == 0:
+					print('{} objects added, loss is {}\n'.format(e, l))
+					self.config.epsilon = max(self.config.epsilon * self.config.epsilon_decay, self.config.min_epsilon)
+				e += 1
+
+				if e % self.config.target_update == 0:
+					self.target_network.load_state_dict(self.network.state_dict())
+			torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.epoch{}'.format(epoch)+'.mdl')
+			fin.close()
+		end_time = time.time()
+		torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.'+self.id+'.mdl')
+		reward_log.close()
+		loss_log.close()
+		train_log = open('./log/train.log', 'a')
+		train_log.write('{}:\n'.format(datetime.now()))
+		train_log.write('{}\n'.format(self.id))
+		train_log.write('{}\n'.format(self.config))
+		train_log.write('training time: {}\n'.format(end_time-start_time))
+		#train_log.write('zero reward: {}, zero reward2: {}\n'.format(reward_is_0, reward2_is_0))
+		train_log.close()
+		self.tree.Clear()
+		self.reference_tree.Clear()
+		cache_tree.Clear()
+
+
 	def Train3(self):
 		#Use the R-tree with full leaf nodes to train
 		start_time = time.time()
@@ -285,13 +540,10 @@ class SplitLearner:
 		cache_tree = RTree(self.config.max_entry, int(0.4 * self.config.max_entry))
 		cache_tree.SetInsertStrategy(self.config.default_ins_strategy)
 		cache_tree.SetSplitStrategy(self.config.default_spl_strategy)
-
 		while object_boundary is not None:
 			object_num += 1
 			object_boundary = self.NextObj()
-
 		objects_for_train = 0
-
 		for epoch in range(self.config.epoch):
 			e = 0
 			self.ResetObjLoader()
@@ -299,7 +551,8 @@ class SplitLearner:
 			self.reference_tree.Clear()
 			#construct r-tree with 1/4 datasets
 			print("setup initial rtree")
-			for i in range(int(object_num/2)):
+			ratio_for_tree_construction = epoch % self.config.parts + 1
+			for i in range(int(object_num * ratio_for_tree_construction / (self.config.parts+1))):
 				object_boundary = self.NextObj()
 				self.tree.DefaultInsert(object_boundary)
 			fo = open('train_object.tmp', 'w')
@@ -349,6 +602,7 @@ class SplitLearner:
 						states, is_valid = self.tree.RetrieveSplitStates()
 
 				if triggered:
+					steps.append((None, None, False))
 					split_triggered += 1
 
 				period += 1
@@ -364,35 +618,41 @@ class SplitLearner:
 							self.memory.push(steps[i][0], steps[i][1], torch.tensor([reward]), steps[i+1][0])
 						else:
 							unuseful_split += 1
-					if steps[-1][2]:
-						useful_split += 1
-						self.memory.push(steps[-1][0], steps[-1][1], torch.tensor([reward]), None)
-					else:
-						unuseful_split += 1
 					self.reference_tree.CopyTree(cache_tree.tree)
 					self.tree.CopyTree(cache_tree.tree)
 					period = 0
 					obj_list_for_reward.clear()
+					steps.clear()
 
 
 				
+				if period % 5 == 0:
+					l = self.Optimize()
+					loss_log.write('{}\n'.format(l))
+					if e % 500 == 0:
+						print('{} objects added, loss is {}\n'.format(e, l))
+						self.config.epsilon = max(self.config.epsilon * self.config.epsilon_decay, self.config.min_epsilon)
+					e += 1
 
-				l = self.Optimize()
-				loss_log.write('{}\n'.format(l))
-				if e % 1000 == 0:
-					print('{} objects added, loss is {}\n'.format(e, l))
-					self.config.epsilon = max(self.config.epsilon * self.config.epsilon_decay, self.config.min_epsilon)
-				e += 1
-
-				if e % self.config.target_update == 0:
-					self.target_network.load_state_dict(self.network.state_dict())
+					if e % self.config.target_update == 0:
+						self.target_network.load_state_dict(self.network.state_dict())
 			torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.epoch{}'.format(epoch)+'.mdl')
 			fin.close()
+		end_time = time.time()
 		torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.mdl')
 		print('{} objects used for training, {} cause splits\n'.format(objects_for_train, split_triggered))
 		debug_log.close()
 		loss_log.close()
-
+		train_log = open('./log/train.log', 'a')
+		train_log.write('{}:\n'.format(datetime.now()))
+		train_log.write('{}\n'.format(self.id))
+		train_log.write('{}\n'.format(self.config))
+		train_log.write('training time: {}, {} objects triggered splitting, {} useful split, {} unuseful split\n'.format(end_time-start_time, split_triggered, useful_split, unuseful_split))
+		train_log.write('zero reward: {}, zero reward2: {}\n'.format(reward_is_0, reward2_is_0))
+		train_log.close()
+		self.tree.Clear()
+		self.reference_tree.Clear()
+		cache_tree.Clear()
 
 
 
@@ -481,6 +741,7 @@ class SplitLearner:
 		end_time = time.time()
 		train_log = open('./log/train.log', 'a')
 		train_log.write('{}:\n'.format(datetime.now()))
+		train_log.write('{}\n'.format(self.id))
 		train_log.write('{}\n'.format(self.config))
 		train_log.write('training time: {}, {} objects triggered splitting, {} useful split, {} unuseful split\n'.format(end_time-start_time, split_triggered, useful_split, unuseful_split))
 		train_log.write('zero reward: {}, zero reward2: {}\n'.format(reward_is_0, reward2_is_0))
@@ -575,9 +836,12 @@ if __name__ == '__main__':
 	if args.action == 'train':
 		spl_learner = SplitLearner()
 		spl_learner.Initialize(args)
-		spl_learner.Train3()
+		spl_learner.Train4()
 	if args.action == 'test':
 		spl_learner = SplitLearner()
 		spl_learner.Initialize(args)
-		spl_learner.Test()
-
+		spl_learner.Test2()
+	if args.action == 'test10':
+		spl_learner = SplitLearner()
+		spl_learner.Initialize(args)
+		spl_learner.Test10_2()

@@ -155,7 +155,9 @@ public:
     SPLIT_STRATEGY split_strategy_;
 
 	Stats stats_;
+	int result_count;
 
+	int debug;
 
 
 public:
@@ -178,6 +180,8 @@ public:
     TreeNode* SplitStepByStep(TreeNode* tree_node, SPLIT_STRATEGY strategy);
     TreeNode* SplitStepByStep(TreeNode* tree_node);
 
+	TreeNode* SplitInLoc(TreeNode* tree_node, int loc);
+
     //Rectangle MergeRectangleList(const vector<pair<double, Rectangle> >& rectangle_list, double min_value);
 
     //void FindMinimumSplit(const vector<TreeNode*>& entries, double(*score_func1)(const Rectangle &, const Rectangle &),
@@ -194,6 +198,8 @@ public:
 
 
 	int Query(Rectangle& rectangle);
+	void GetSplitStates(TreeNode* tree_node, double* states);
+
 	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitOVERLAPCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
@@ -201,6 +207,7 @@ public:
 	void SplitQUADRATICCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 
 	void Print();
+	void PrintEntryNum();
 };
 
 
@@ -210,11 +217,15 @@ extern "C"{
 
 	int RetrieveStates(RTree* tree, TreeNode* tree_node, double* states);
 
+	void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states);
+
 	RTree* ConstructTree(int max_entry, int min_entry);
 
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
 	void SetDefaultSplitStrategy(RTree* rtree, int strategy);
 	int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top);
+
+	int GetQueryResult(RTree* rtree);
 	
 	TreeNode* GetRoot(RTree* rtree);
 
@@ -233,6 +244,9 @@ extern "C"{
 	void DefaultInsertWithHistory(RTree* rtree, Rectangle* rec);
 
 	TreeNode* SplitOneStep(RTree* rtree, TreeNode* node, int strategy);
+
+	TreeNode* SplitWithLoc(RTree* rtree, TreeNode* node, int loc);
+
 	int IsLeaf(TreeNode* node);
 	int IsOverflow(TreeNode* node);
 
@@ -240,8 +254,13 @@ extern "C"{
 
 	void PrintTree(RTree* rtree);
 
+	void PrintEntryNum(RTree* rtree);
+
 	int TotalTreeNode(RTree* rtree);
 	int TreeHeight(RTree* rtree);
+
+	void SetDebug(RTree* rtree, int value);
+	
 
 	void Clear(RTree* rtree);
 }
