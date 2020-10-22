@@ -34,6 +34,9 @@ class RTree:
 		self.lib.SplitWithLoc.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
 		self.lib.SplitWithLoc.restype = ctypes.c_void_p
 
+		self.lib.InsertWithLoc.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+		self.lib.InsertWithLoc.restype = ctypes.c_void_p
+
 		self.lib.IsLeaf.argtypes = [ctypes.c_void_p]
 		self.lib.IsLeaf.restype = ctypes.c_int
 
@@ -46,6 +49,9 @@ class RTree:
 		self.lib.RetrieveSpecialStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialStates.restype = ctypes.c_void_p
 
+		self.lib.RetrieveSpecialInsertStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSpecialInsertStates.restype = ctypes.c_void_p
+
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
 
@@ -57,6 +63,9 @@ class RTree:
 
 		self.lib.DefaultInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.DefaultInsert.restype = ctypes.c_void_p
+
+		self.lib.DefaultSplit.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.DefaultSplit.restype = ctypes.c_void_p
 
 		self.lib.DirectInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.DirectInsert.restype = ctypes.c_void_p
@@ -85,11 +94,16 @@ class RTree:
 		self.lib.GetQueryResult.argtypes = [ctypes.c_void_p]
 		self.lib.GetQueryResult.restype = ctypes.c_int
 
+		self.lib.GetChildNum.argtypes = [ctypes.c_void_p]
+		self.lib.GetChildNum.restype = ctypes.c_int
+
 		self.tree = self.lib.ConstructTree(max_entry, min_entry)
 		self.strategy_map = {"INS_AREA":0, "INS_MARGIN":1, "INS_OVERLAP":2, "INS_RANDOM":3, "SPL_MIN_AREA":0, "SPL_MIN_MARGIN":1, "SPL_MIN_OVERLAP":2, "SPL_QUADRATIC":3, "SPL_GREENE":4}
 
 		self.insert_strategy = None
 		self.split_strategy = None
+		self.max_entry = max_entry
+		self.min_entry = min_entry
 
 		self.debug = False
 
@@ -151,6 +165,15 @@ class RTree:
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
+	def RetrieveSpecialInsertStates(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		state_length = 6 + 9 * self.max_entry
+		state_c = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSpecialInsertStates(self.tree, self.ptr, self.rec, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
+
 
 	def UniformRandomQuery(self, wr, hr):
 		boundary_c = (ctypes.c_double * 4)()
@@ -173,6 +196,25 @@ class RTree:
 		y = random.uniform(object_boundary[2] - 2 * height, object_boundary[3] + 2 * height)
 		return [x, x+width, y, y+height]
 
+	def CountChildNodes(self):
+		child_num = self.lib.GetChildNum(self.ptr)
+		return child_num
+
+	def IsLeaf(self):
+		if self.lib.IsLeaf(self.ptr):
+			return True
+		else:
+			return False
+
+	def InsertWithLoc(self, loc):
+		self.next_ptr = self.lib.InsertWithLoc(self.tree, self.ptr, loc, self.rec)
+		if self.lib.IsLeaf(self.ptr):
+			return True
+		else:
+			self.ptr = self.next_ptr
+			return False
+		
+
 	def Query(self, boundary):
 		node_access = self.lib.QueryRectangle(self.tree, boundary[0], boundary[1], boundary[2], boundary[3])
 		return node_access
@@ -193,6 +235,10 @@ class RTree:
 	def DefaultInsert(self, boundary):
 		self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
 		self.lib.DefaultInsert(self.tree, self.rec)
+
+	def DefaultSplit(self):
+		self.lib.DefaultSplit(self.tree, self.ptr)
+
 
 
 	def CopyTree(self, tree):
@@ -270,18 +316,29 @@ if __name__ == '__main__':
 	bs = [0.0,6.0,2.0,7.0,4.0,8.0,5.0,1.0,3.0,1.0,9.0,9.0]
 	ts = [2.0,8.0,4.0,10.0,7.0,11.0,7.0,3.0,5.0,4.0,11.0,12.0]
 
-	tree = RTree()
+	tree = RTree(3, 1)
 	tree.SetInsertStrategy('INS_AREA')
 	tree.SetSplitStrategy('SPL_MIN_AREA')
 	for i in range(len(ls)):
-		tree.DefaultInsert(ls[i], rs[i], bs[i], ts[i])
+		#tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
+		tree.PrepareRectangle(ls[i], rs[i], bs[i], ts[i])
 
+		states = tree.RetrieveSpecialInsertStates() #叶节点retrieve 的state是None
+		while states is not None:
+			print(states)
+			tree.InsertWithLoc(0)
+			states = tree.RetrieveSpecialInsertStates()
+		tree.InsertWithLoc(0)
+		
+
+		tree.DefaultSplit()
+		print(tree.CountChildNodes())
 		tree.Print()
 	
 	
 	l, r, b, t = tree.UniformRandomQuery(2.0, 4.0)
 	print(l, r, b, t)
-	access = tree.Query(l, r, b, t)
+	access = tree.Query((l, r, b, t))
 	print("{} nodes are accessed\n".format(access))
 
 

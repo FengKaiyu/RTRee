@@ -23,6 +23,7 @@ using std::sort;
 using std::cout;
 using std::ceil;
 using std::endl;
+using std::exp;
 
 
 
@@ -112,6 +113,8 @@ public:
     bool is_overflow;
 	bool is_leaf;
 
+	double origin_center[2];
+
     static int maximum_entry;
     static int minimum_entry;
 
@@ -159,6 +162,10 @@ public:
 
 	int debug;
 
+	double RR_s;
+	double RR_y1;
+	double RR_ys;
+
 
 public:
 
@@ -168,6 +175,9 @@ public:
 	void Copy(RTree* tree);
 	TreeNode* Root();
 	Rectangle* InsertRectangle(double left, double right, double bottom, double top);
+
+	TreeNode* RRInsert(Rectangle* rectangle, TreeNode* tree_node);
+	TreeNode* RRSplit(TreeNode* tree_node);
 
     TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node, INSERT_STRATEGY strategy);
     TreeNode* InsertStepByStep(const Rectangle* rectangle, TreeNode* tree_node);
@@ -181,6 +191,7 @@ public:
     TreeNode* SplitStepByStep(TreeNode* tree_node);
 
 	TreeNode* SplitInLoc(TreeNode* tree_node, int loc);
+	TreeNode* InsertInLoc(TreeNode* tree_node, int loc, Rectangle* rec);
 
     //Rectangle MergeRectangleList(const vector<pair<double, Rectangle> >& rectangle_list, double min_value);
 
@@ -199,6 +210,7 @@ public:
 
 	int Query(Rectangle& rectangle);
 	void GetSplitStates(TreeNode* tree_node, double* states);
+	void GetInsertStates(TreeNode* tree_node, Rectangle* rec, double* states);
 
 	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
@@ -219,6 +231,9 @@ extern "C"{
 
 	void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states);
 
+	void RetrieveSpecialInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
+
+
 	RTree* ConstructTree(int max_entry, int min_entry);
 
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
@@ -235,11 +250,24 @@ extern "C"{
 	TreeNode* InsertOneStep(RTree* rtree, Rectangle* rec, TreeNode* node, int strategy);
 
 	TreeNode* DirectInsert(RTree* rtree, Rectangle* rec);
+
+	void DirectSplit(RTree* rtree, TreeNode* tree_node);
+
+
 	void DirectSplit(RTree* rtree, TreeNode* node);
 
 	int TryInsert(RTree* rtree, Rectangle* rec);
 
+	TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* rec);
+
 	void DefaultInsert(RTree* rtree, Rectangle* rec);
+
+	void DefaultSplit(RTree* rtree, TreeNode* tree_node);
+
+
+	TreeNode* RRInsert(RTree* rtree, Rectangle* rec);
+
+	void RRSplit(RTree* rtree, TreeNode* node);
 
 	void DefaultInsertWithHistory(RTree* rtree, Rectangle* rec);
 
@@ -249,6 +277,8 @@ extern "C"{
 
 	int IsLeaf(TreeNode* node);
 	int IsOverflow(TreeNode* node);
+
+	int GetChildNum(TreeNode* node);
 
 	void GetMBR(RTree* rtree, double* boundary);
 
