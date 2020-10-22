@@ -568,7 +568,7 @@ TreeNode* SplitWithLoc(RTree* tree, TreeNode* tree_node, int loc) {
 }
 
 TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* rec){
-	cout<<"insert with loc invoked"<<endl;
+	//cout<<"insert with loc invoked"<<endl;
 	TreeNode* next_node = tree->InsertInLoc(tree_node, loc, rec);
 	return next_node;
 }
@@ -577,7 +577,7 @@ TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* re
 TreeNode* RTree::InsertInLoc(TreeNode *tree_node, int loc, Rectangle *rec){
 	TreeNode* next_node = nullptr;
 	if(tree_node->is_leaf){
-		cout<<"is leaf"<<endl;
+		//cout<<"is leaf"<<endl;
 		if(tree_node->entry_num == 0){
 			tree_node->Set(*rec);
 		}
