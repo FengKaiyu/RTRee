@@ -55,8 +55,14 @@ class RTree:
 		self.lib.RetrieveSpecialInsertStates3.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialInsertStates3.restype = ctypes.c_void_p
 
+		self.lib.RetrieveSpecialInsertStates4.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSpecialInsertStates4.restype = ctypes.c_void_p
+
 		self.lib.RetrieveSpecialInsertStates6.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialInsertStates6.restype = ctypes.c_void_p
+		
+		self.lib.RetrieveSpecialInsertStates7.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSpecialInsertStates7.restype = ctypes.c_void_p
 
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
@@ -189,12 +195,30 @@ class RTree:
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
+	def RetrieveSpecialInsertStates4(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		state_length = 4 * self.max_entry
+		state_c = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSpecialInsertStates4(self.tree, self.ptr, self.rec, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
+
 	def RetrieveSpecialInsertStates6(self):
 		if self.lib.IsLeaf(self.ptr):
 			return None
 		state_length = 6 * self.max_entry
 		state_c	 = (ctypes.c_double * state_length)()
 		self.lib.RetrieveSpecialInsertStates6(self.tree, self.ptr, self.rec, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
+
+	def RetrieveSpecialInsertStates7(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		state_length = 7 * self.max_entry
+		state_c	 = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSpecialInsertStates7(self.tree, self.ptr, self.rec, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
@@ -348,17 +372,25 @@ if __name__ == '__main__':
 		tree.PrepareRectangle(ls[i], rs[i], bs[i], ts[i])
 
 		states3 = tree.RetrieveSpecialInsertStates3()
+		states4 = tree.RetrieveSpecialInsertStates4()
 		states6 = tree.RetrieveSpecialInsertStates6() #叶节点retrieve 的state是None
+		states7 = tree.RetrieveSpecialInsertStates7()
 		while states3 is not None and states6 is not None:
 			print('states3', states3)
+			print('states4', states4)
 			print('states6', states6)
+			print('states7', states7)
 			tree.InsertWithLoc(0)
 			states3 = tree.RetrieveSpecialInsertStates3()
+			states4 = tree.RetrieveSpecialInsertStates4()
 			states6 = tree.RetrieveSpecialInsertStates6()
+			states7 = tree.RetrieveSpecialInsertStates7()
 		tree.InsertWithLoc(0)
 		
 		print('states3', states3)
+		print('states4', states4)
 		print('states6', states6)
+		print('states7', states7)
 
 		tree.DefaultSplit()
 		print(tree.CountChildNodes())

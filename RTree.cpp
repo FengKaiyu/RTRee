@@ -1872,6 +1872,97 @@ TreeNode* RTree::InsertStepByStep(const Rectangle *rectangle, TreeNode *tree_nod
 	return next_node;
 }
 
+void RTree::GetInsertStates7(TreeNode *tree_node, Rectangle *rec, double *states){
+	int size = 7 * TreeNode::maximum_entry;
+	Rectangle new_rectangle;
+	double max_delta_area = 0;
+	double max_delta_perimeter = 0;
+	double max_delta_overlap = 0;
+	double max_area = 0;
+	double max_perimeter = 0;
+	double max_overlap = 0;
+	for(int i = 0; i < tree_node->entry_num; i++){
+		int pos = i * 7;
+		int child_id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[child_id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double old_area = child->Area();
+		double new_area = new_rectangle.Area();
+
+		double old_perimeter = child->Perimeter();
+		double new_perimeter = new_rectangle.Perimeter();
+
+		double old_overlap = 0;
+		double new_overlap = 0;
+		for(int j=0; j<tree_node->entry_num; j++){
+			if(i == j)continue;
+			TreeNode* other_child = tree_nodes_[tree_node->children[j]];
+			old_overlap += SplitOverlap(*child, *other_child);
+			new_overlap += SplitOverlap(new_rectangle, *other_child);
+		}
+		if(new_area - old_area > max_delta_area){
+			max_delta_area = new_area - old_area;
+		}
+		if(new_perimeter - old_perimeter > max_delta_perimeter){
+			max_delta_perimeter = new_perimeter - old_perimeter;
+		}
+		if(new_overlap - old_overlap > max_delta_overlap){
+			max_delta_overlap = new_overlap - old_overlap;
+		}
+		if(old_area > max_area){
+			max_area = old_area;
+		}
+		if(old_perimeter > max_perimeter){
+			max_perimeter = old_perimeter;
+		}
+		if(old_overlap > max_overlap){
+			max_overlap = old_overlap;
+		}
+		states[pos] = child->Area();
+		states[pos+1] = child->Perimeter();
+		states[pos+2] = old_overlap;
+		states[pos+3] = new_area - old_area;
+		states[pos+4] = new_perimeter - old_perimeter;
+		states[pos+5] = new_overlap - old_overlap;
+		states[pos+6] = 1.0 * child->entry_num / TreeNode::maximum_entry;
+	}
+	for(int i=tree_node->entry_num; i < TreeNode::maximum_entry; i++){
+		int loc = (i - tree_node->entry_num) % tree_node->entry_num;
+		for(int j=0; j<7; j++){
+			states[i * 7 + j] = states[loc*7 +j];
+		}
+	}
+	for(int i=0; i<size; i++){
+		switch(i%7){
+			case 0:{
+				states[i] = states[i] / (max_area + 0.001);
+				break;
+			}
+			case 1:{
+				states[i] = states[i] / (max_perimeter + 0.001);
+				break;
+			}
+			case 2:{
+				states[i] = states[i] / (max_overlap + 0.001);
+				break;
+			}
+			case 3:{
+				states[i] = states[i] / (max_delta_area + 0.001);
+				break;
+			}
+			case 4:{
+				states[i] = states[i] / (max_delta_perimeter + 0.001);
+				break;
+			}
+			case 5:{
+				states[i] = states[i] / (max_delta_overlap + 0.001);
+				break;
+			}
+		}
+	}
+}
+
 void RTree::GetInsertStates6(TreeNode *tree_node, Rectangle *rec, double *states){
 	int size = 6 * TreeNode::maximum_entry;
 	Rectangle new_rectangle;
@@ -1955,6 +2046,72 @@ void RTree::GetInsertStates6(TreeNode *tree_node, Rectangle *rec, double *states
 				break;
 			}
 			case 5:{
+				states[i] = states[i] / (max_delta_overlap + 0.001);
+				break;
+			}
+		}
+	}
+}
+
+void RTree::GetInsertStates4(TreeNode *tree_node, Rectangle *rec, double *states){
+	int size = 4 * TreeNode::maximum_entry;
+	Rectangle new_rectangle;
+	double max_delta_area = 0;
+	double max_delta_perimeter = 0;
+	double max_delta_overlap = 0;
+	for(int i = 0; i < tree_node->entry_num; i++){
+		int pos = i * 4;
+		int child_id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[child_id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double old_area = child->Area();
+		double new_area = new_rectangle.Area();
+
+		double old_perimeter = child->Perimeter();
+		double new_perimeter = new_rectangle.Perimeter();
+
+		double old_overlap = 0;
+		double new_overlap = 0;
+		for(int j=0; j<tree_node->entry_num; j++){
+			if(i == j)continue;
+			TreeNode* other_child = tree_nodes_[tree_node->children[j]];
+			old_overlap += SplitOverlap(*child, *other_child);
+			new_overlap += SplitOverlap(new_rectangle, *other_child);
+		}
+		states[pos] = new_area - old_area;
+		states[pos+1] = new_perimeter - old_perimeter;
+		states[pos+2] = new_overlap - old_overlap;
+		states[pos+3] = 1.0 * child->entry_num / TreeNode::maximum_entry;
+
+		//cout<<"state4: "<<states[pos]<<" "<<states[pos+1]<<" "<<states[pos+2]<<" "<<states[pos+3]<<endl;
+		if(new_area - old_area > max_delta_area){
+			max_delta_area = new_area - old_area;
+		}
+		if(new_perimeter - old_perimeter > max_delta_perimeter){
+			max_delta_perimeter = new_perimeter - old_perimeter;
+		}
+		if(new_overlap - old_overlap > max_delta_overlap){
+			max_delta_overlap = new_overlap - old_overlap;
+		}
+	}
+	for(int i = tree_node->entry_num; i < TreeNode::maximum_entry; i++){
+		int loc = (i - tree_node->entry_num) % tree_node->entry_num;
+		for(int j=0; j<4; j++){
+			states[i*4 + j] = states[loc*4 + j];
+		}
+	}
+	for(int i=0; i<size; i++){
+		switch(i%4){
+			case 0:{
+				states[i] = states[i] / (max_delta_area + 0.001);
+				break;
+			}
+			case 1:{
+				states[i] = states[i] / (max_delta_perimeter + 0.001);
+				break;
+			}
+			case 2:{
 				states[i] = states[i] / (max_delta_overlap + 0.001);
 				break;
 			}
@@ -3081,10 +3238,17 @@ void RetrieveSpecialInsertStates3(RTree* tree, TreeNode* tree_node, Rectangle* r
 	tree->GetInsertStates3(tree_node, rec, states);
 }
 
+void RetrieveSpecialInsertStates4(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states){
+	tree->GetInsertStates4(tree_node, rec, states);
+}
+
 void RetrieveSpecialInsertStates6(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states){
 	tree->GetInsertStates6(tree_node, rec, states);
 }
 
+void RetrieveSpecialInsertStates7(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states){
+	tree->GetInsertStates7(tree_node, rec, states);
+}
 
 int RetrieveStates(RTree* tree, TreeNode* tree_node, double* states) {
 	vector<double> values(5, 0);
