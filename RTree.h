@@ -211,6 +211,8 @@ public:
 	int Query(Rectangle& rectangle);
 	void GetSplitStates(TreeNode* tree_node, double* states);
 	void GetInsertStates(TreeNode* tree_node, Rectangle* rec, double* states);
+	void GetInsertStates3(TreeNode* tree_node, Rectangle* rec, double* states);
+	void GetInsertStates6(TreeNode* tree_node, Rectangle* rec, double* states);
 
 	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
@@ -232,6 +234,8 @@ extern "C"{
 	void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states);
 
 	void RetrieveSpecialInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
+	void RetrieveSpecialInsertStates3(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
+	void RetrieveSpecialInsertStates6(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 
 
 	RTree* ConstructTree(int max_entry, int min_entry);
