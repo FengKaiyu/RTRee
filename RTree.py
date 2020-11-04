@@ -67,6 +67,12 @@ class RTree:
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
 
+		self.lib.GetNodeBoundary.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.GetNodeBoundary.restype = ctypes.c_void_p
+
+		self.lib.GetMinAreaContainingChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.GetMinAreaContainingChild.restype = ctypes.c_int
+
 		self.lib.PrintTree.argtypes = [ctypes.c_void_p]
 		self.lib.PrintTree.restype = ctypes.c_void_p
 
@@ -176,6 +182,15 @@ class RTree:
 		self.lib.RetrieveSpecialStates(self.tree, self.ptr, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states
+
+	def GetMinAreaContainingChild(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		child = self.lib.GetMinAreaContainingChild(self.tree, self.ptr, self.rec)
+		if child < 0:
+			return None
+		else:
+			return child
 
 	def RetrieveSpecialInsertStates(self):
 		if self.lib.IsLeaf(self.ptr):
@@ -357,6 +372,12 @@ class RTree:
 	def DirectSplit(self):
 		self.lib.DirectSplit(self.tree, self.ptr)
 
+	def GetNodeBoundary(self):
+		boundary_c = (ctypes.c_double * 4)()
+		self.lib.GetNodeBoundary(self.ptr, boundary_c)
+		boundary = np.ctypeslib.as_array(boundary_c)
+		return boundary
+
 
 if __name__ == '__main__':
 	ls = [0.0, 3.0, 11.0, 8.0, 5.0, 13.0, 15.0, 9.0, 1.0, 13.0, 10.0, 14.0]
@@ -370,16 +391,17 @@ if __name__ == '__main__':
 	for i in range(len(ls)):
 		#tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
 		tree.PrepareRectangle(ls[i], rs[i], bs[i], ts[i])
-
+		child = tree.GetMinAreaContainingChild()
+		print(ls[i], rs[i], bs[i], ts[i])
+		tree.Print()
+		print(tree.GetNodeBoundary())
+		print('child',child)
 		states3 = tree.RetrieveSpecialInsertStates3()
 		states4 = tree.RetrieveSpecialInsertStates4()
 		states6 = tree.RetrieveSpecialInsertStates6() #叶节点retrieve 的state是None
 		states7 = tree.RetrieveSpecialInsertStates7()
 		while states3 is not None and states6 is not None:
-			print('states3', states3)
-			print('states4', states4)
-			print('states6', states6)
-			print('states7', states7)
+
 			tree.InsertWithLoc(0)
 			states3 = tree.RetrieveSpecialInsertStates3()
 			states4 = tree.RetrieveSpecialInsertStates4()
@@ -387,14 +409,10 @@ if __name__ == '__main__':
 			states7 = tree.RetrieveSpecialInsertStates7()
 		tree.InsertWithLoc(0)
 		
-		print('states3', states3)
-		print('states4', states4)
-		print('states6', states6)
-		print('states7', states7)
+
 
 		tree.DefaultSplit()
-		print(tree.CountChildNodes())
-		tree.Print()
+
 	
 	
 	l, r, b, t = tree.UniformRandomQuery(2.0, 4.0)

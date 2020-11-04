@@ -215,6 +215,7 @@ public:
 	void GetInsertStates4(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates6(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates7(TreeNode* tree_node, Rectangle* rec, double* states);
+	int GetMinAreaContainingChild(TreeNode* tree_node, Rectangle* rec);
 
 	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
@@ -246,6 +247,8 @@ extern "C"{
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
 	void SetDefaultSplitStrategy(RTree* rtree, int strategy);
 	int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top);
+
+	int GetMinAreaContainingChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 
 	int GetQueryResult(RTree* rtree);
 	
@@ -288,6 +291,7 @@ extern "C"{
 	int GetChildNum(TreeNode* node);
 
 	void GetMBR(RTree* rtree, double* boundary);
+	void GetNodeBoundary(TreeNode* node, double* boundary);
 
 	void PrintTree(RTree* rtree);
 

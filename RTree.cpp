@@ -2586,6 +2586,21 @@ void RTree::SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle
 }
 
 
+int RTree::GetMinAreaContainingChild(TreeNode *tree_node, Rectangle *rec){
+	double min_area = DBL_MAX;
+	int child_id = -1;
+	for(int i=0; i<tree_node->entry_num; i++){
+		TreeNode* child = tree_nodes_[tree_node->children[i]];
+		if(child->Contains(rec)){
+			if(child->Area() < min_area){
+				min_area = child->Area();
+				child_id = i;
+			}
+		}
+	}
+	return child_id;
+}
+
 void RTree::SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& bounding_box1, Rectangle& bounding_box2) {
 	double minimum_perimeter = DBL_MAX;
 	double minimum_overlap = DBL_MAX;
@@ -3224,7 +3239,9 @@ bool IsSameSplit(Rectangle& rec00, Rectangle& rec01, Rectangle& rec10, Rectangle
     return (is_same1 && is_same2);
 }
 
-
+int GetMinAreaContainingChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
+	return rtree->GetMinAreaContainingChild(tree_node, rec);
+}
 
 void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states) {
 	tree->GetSplitStates(tree_node, states);
@@ -3479,4 +3496,12 @@ void RTree::Copy(RTree* tree) {
 void CopyTree(RTree* tree, RTree* from_tree) {
 	Clear(tree);
 	tree->Copy(from_tree);
+}
+
+void GetNodeBoundary(TreeNode* node, double* boundary){
+	boundary[0] = node->Left();
+	boundary[1] = node->Right();
+	boundary[2] = node->Bottom();
+	boundary[3] = node->Top();
+	return;
 }
