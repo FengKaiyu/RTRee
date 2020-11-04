@@ -1872,6 +1872,66 @@ TreeNode* RTree::InsertStepByStep(const Rectangle *rectangle, TreeNode *tree_nod
 	return next_node;
 }
 
+void RTree::GetInsertStates7Fill0(TreeNode *tree_node, Rectangle *rec, double *states){
+	int size = 7 * TreeNode::maximum_entry;
+	for(int i=0; i<size; i++){
+		states[i] = 0;
+	}
+	Rectangle new_rectangle;
+	double max_delta_area = 0;
+	double max_delta_perimeter = 0;
+	double max_delta_overlap = 0;
+	double max_area = 0;
+	double max_perimeter = 0;
+	double max_overlap = 0;
+	for(int i = 0; i < tree_node->entry_num; i++){
+		int pos = i * 7;
+		int child_id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[child_id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double old_area = child->Area();
+		double new_area = new_rectangle.Area();
+
+		double old_perimeter = child->Perimeter();
+		double new_perimeter = new_rectangle.Perimeter();
+
+		double old_overlap = 0;
+		double new_overlap = 0;
+		for(int j=0; j<tree_node->entry_num; j++){
+			if(i == j)continue;
+			TreeNode* other_child = tree_nodes_[tree_node->children[j]];
+			old_overlap += SplitOverlap(*child, *other_child);
+			new_overlap += SplitOverlap(new_rectangle, *other_child);
+		}
+		if(new_area - old_area > max_delta_area){
+			max_delta_area = new_area - old_area;
+		}
+		if(new_perimeter - old_perimeter > max_delta_perimeter){
+			max_delta_perimeter = new_perimeter - old_perimeter;
+		}
+		if(new_overlap - old_overlap > max_delta_overlap){
+			max_delta_overlap = new_overlap - old_overlap;
+		}
+		if(old_area > max_area){
+			max_area = old_area;
+		}
+		if(old_perimeter > max_perimeter){
+			max_perimeter = old_perimeter;
+		}
+		if(old_overlap > max_overlap){
+			max_overlap = old_overlap;
+		}
+		states[pos] = child->Area();
+		states[pos+1] = child->Perimeter();
+		states[pos+2] = old_overlap;
+		states[pos+3] = new_area - old_area;
+		states[pos+4] = new_perimeter - old_perimeter;
+		states[pos+5] = new_overlap - old_overlap;
+		states[pos+6] = 1.0 * child->entry_num / TreeNode::maximum_entry;
+	}
+}
+
 void RTree::GetInsertStates7(TreeNode *tree_node, Rectangle *rec, double *states){
 	int size = 7 * TreeNode::maximum_entry;
 	Rectangle new_rectangle;
@@ -2601,6 +2661,67 @@ int RTree::GetMinAreaContainingChild(TreeNode *tree_node, Rectangle *rec){
 	return child_id;
 }
 
+int RTree::GetMinAreaEnlargementChild(TreeNode *tree_node, Rectangle *rec){
+	double min_area_enlargement = DBL_MAX;
+	int child_id = 0;
+	Rectangle new_rectangle;
+	for(int i=0; i<tree_node->entry_num; i++){
+		int id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double area_enlargement = new_rectangle.Area() - child->Area();
+		if(area_enlargement < min_area_enlargement){
+			min_area_enlargement = area_enlargement;
+			child_id = i;
+		}
+	}
+	return child_id;
+}
+
+int RTree::GetMinMarginIncrementChild(TreeNode *tree_node, Rectangle *rec){
+	double min_margin_increase = DBL_MAX;
+	int child_id = 0;
+	Rectangle new_rectangle;
+	for(int i=0; i<tree_node->entry_num; i++){
+		int id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double margin_increase = new_rectangle.Perimeter() - child->Perimeter();
+		if(margin_increase < min_margin_increase){
+			min_margin_increase = margin_increase;
+			child_id = i;
+		}
+	}
+	return child_id;
+}
+
+int RTree::GetMinOverlapIncrementChild(TreeNode *tree_node, Rectangle *rec){
+	double min_overlap_increase = DBL_MAX;
+	int child_id = 0;
+	Rectangle new_rectangle;
+	for(int i=0; i<tree_node->entry_num; i++){
+		int id = tree_node->children[i];
+		TreeNode* child = tree_nodes_[id];
+		new_rectangle.Set(*child);
+		new_rectangle.Include(*rec);
+		double old_overlap = 0;
+		double new_overlap = 0;
+		for(int j=0; j<tree_node->entry_num; j++){
+			if(i == j)continue;
+			TreeNode* other_child = tree_nodes_[tree_node->children[j]];
+			old_overlap += SplitOverlap(*child, *other_child);
+			new_overlap += SplitOverlap(new_rectangle, *other_child);
+		}
+		if(new_overlap - old_overlap < min_overlap_increase){
+			min_overlap_increase = new_overlap - old_overlap;
+			child_id = i;
+		}
+	}
+	return child_id;
+}
+
 void RTree::SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& bounding_box1, Rectangle& bounding_box2) {
 	double minimum_perimeter = DBL_MAX;
 	double minimum_overlap = DBL_MAX;
@@ -3263,6 +3384,11 @@ void RetrieveSpecialInsertStates6(RTree* tree, TreeNode* tree_node, Rectangle* r
 	tree->GetInsertStates6(tree_node, rec, states);
 }
 
+
+void RetrieveSpecialInsertStates7Fill0(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states){
+	tree->GetInsertStates7Fill0(tree_node, rec, states);
+}
+
 void RetrieveSpecialInsertStates7(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states){
 	tree->GetInsertStates7(tree_node, rec, states);
 }
@@ -3504,4 +3630,14 @@ void GetNodeBoundary(TreeNode* node, double* boundary){
 	boundary[2] = node->Bottom();
 	boundary[3] = node->Top();
 	return;
+}
+
+int GetMinAreaEnlargementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
+	return rtree->GetMinAreaEnlargementChild(tree_node, rec);
+}
+int GetMinMarginIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
+	return rtree->GetMinMarginIncrementChild(tree_node, rec);
+}
+int GetMinOverlapIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
+	return rtree->GetMinOverlapIncrementChild(tree_node, rec);
 }

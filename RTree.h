@@ -215,7 +215,11 @@ public:
 	void GetInsertStates4(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates6(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates7(TreeNode* tree_node, Rectangle* rec, double* states);
+	void GetInsertStates7Fill0(TreeNode* tree_node, Rectangle* rec, double* states);
 	int GetMinAreaContainingChild(TreeNode* tree_node, Rectangle* rec);
+	int GetMinAreaEnlargementChild(TreeNode* tree_node, Rectangle* rec);
+	int GetMinMarginIncrementChild(TreeNode* tree_node, Rectangle* rec);
+	int GetMinOverlapIncrementChild(TreeNode* tree_node, Rectangle* rec);
 
 	void SplitAREACost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
 	void SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectangle& rec1, Rectangle& rec2);
@@ -241,6 +245,7 @@ extern "C"{
 	void RetrieveSpecialInsertStates4(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 	void RetrieveSpecialInsertStates6(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 	void RetrieveSpecialInsertStates7(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
+	void RetrieveSpecialInsertStates7Fill0(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 
 	RTree* ConstructTree(int max_entry, int min_entry);
 
@@ -249,6 +254,9 @@ extern "C"{
 	int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top);
 
 	int GetMinAreaContainingChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
+	int GetMinAreaEnlargementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
+	int GetMinMarginIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
+	int GetMinOverlapIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 
 	int GetQueryResult(RTree* rtree);
 	

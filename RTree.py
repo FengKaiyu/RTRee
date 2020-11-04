@@ -64,6 +64,9 @@ class RTree:
 		self.lib.RetrieveSpecialInsertStates7.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialInsertStates7.restype = ctypes.c_void_p
 
+		self.lib.RetrieveSpecialInsertStates7Fill0.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSpecialInsertStates7Fill0.restype = ctypes.c_void_p
+
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
 
@@ -72,6 +75,16 @@ class RTree:
 
 		self.lib.GetMinAreaContainingChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.GetMinAreaContainingChild.restype = ctypes.c_int
+
+		self.lib.GetMinAreaEnlargementChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.GetMinAreaEnlargementChild.restype = ctypes.c_int
+
+		self.lib.GetMinMarginIncrementChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.GetMinMarginIncrementChild.restype = ctypes.c_int
+
+		self.lib.GetMinOverlapIncrementChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.GetMinOverlapIncrementChild.restype = ctypes.c_int
+
 
 		self.lib.PrintTree.argtypes = [ctypes.c_void_p]
 		self.lib.PrintTree.restype = ctypes.c_void_p
@@ -192,6 +205,24 @@ class RTree:
 		else:
 			return child
 
+	def GetMinAreaEnlargementChild(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		child = self.lib.GetMinAreaEnlargementChild(self.tree, self.ptr, self.rec)
+		return child
+
+	def GetMinMarginIncrementChild(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		child = self.lib.GetMinMarginIncrementChild(self.tree, self.ptr, self.rec)
+		return child
+
+	def GetMinOverlapIncrementChild(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		child = self.lib.GetMinOverlapIncrementChild(self.tree, self.ptr, self.rec)
+		return child
+
 	def RetrieveSpecialInsertStates(self):
 		if self.lib.IsLeaf(self.ptr):
 			return None
@@ -234,6 +265,15 @@ class RTree:
 		state_length = 7 * self.max_entry
 		state_c	 = (ctypes.c_double * state_length)()
 		self.lib.RetrieveSpecialInsertStates7(self.tree, self.ptr, self.rec, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
+
+	def RetrieveSpecialInsertStates7Fill0(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		state_length = 7 * self.max_entry
+		state_c = (ctyoes.c_double * state_length)()
+		self.lbi.RetrieveSpecialInsertStates7Fill0(self.tree, self.ptr, self.rec, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
@@ -395,7 +435,12 @@ if __name__ == '__main__':
 		print(ls[i], rs[i], bs[i], ts[i])
 		tree.Print()
 		print(tree.GetNodeBoundary())
+		child1 = tree.GetMinAreaEnlargementChild()
+		child2 = tree.GetMinMarginIncrementChild()
+		child3 = tree.GetMinOverlapIncrementChild()
 		print('child',child)
+		print(child1, child2, child3)
+		
 		states3 = tree.RetrieveSpecialInsertStates3()
 		states4 = tree.RetrieveSpecialInsertStates4()
 		states6 = tree.RetrieveSpecialInsertStates6() #叶节点retrieve 的state是None
