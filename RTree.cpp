@@ -1930,6 +1930,34 @@ void RTree::GetInsertStates7Fill0(TreeNode *tree_node, Rectangle *rec, double *s
 		states[pos+5] = new_overlap - old_overlap;
 		states[pos+6] = 1.0 * child->entry_num / TreeNode::maximum_entry;
 	}
+	for(int i=0; i<size; i++){
+		switch(i%7){
+			case 0:{
+				states[i] = states[i] / (max_area + 0.001);
+				break;
+			}
+			case 1:{
+				states[i] = states[i] / (max_perimeter + 0.001);
+				break;
+			}
+			case 2:{
+				states[i] = states[i] / (max_overlap + 0.001);
+				break;
+			}
+			case 3:{
+				states[i] = states[i] / (max_delta_area + 0.001);
+				break;
+			}
+			case 4:{
+				states[i] = states[i] / (max_delta_perimeter + 0.001);
+				break;
+			}
+			case 5:{
+				states[i] = states[i] / (max_delta_overlap + 0.001);
+				break;
+			}
+		}
+	}
 }
 
 void RTree::GetInsertStates7(TreeNode *tree_node, Rectangle *rec, double *states){

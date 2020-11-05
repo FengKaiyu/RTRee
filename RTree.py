@@ -272,8 +272,8 @@ class RTree:
 		if self.lib.IsLeaf(self.ptr):
 			return None
 		state_length = 7 * self.max_entry
-		state_c = (ctyoes.c_double * state_length)()
-		self.lbi.RetrieveSpecialInsertStates7Fill0(self.tree, self.ptr, self.rec, state_c)
+		state_c = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSpecialInsertStates7Fill0(self.tree, self.ptr, self.rec, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
