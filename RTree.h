@@ -38,6 +38,10 @@ enum TYPE {
 	REC, TREE_NODE
 };
 
+enum INSERT_STATE_TYPE{
+	RL_FOR_ENLARGED_CHILDREN, RL_FOR_CONTAINING_CHILDREN
+};
+
 struct Point{
 public:
     double x;
@@ -71,7 +75,7 @@ public:
 	double Perimeter() const { return 2 * (top_ - bottom_ + right_ - left_); };
 
 
-	bool Contains(Rectangle* rec);
+	bool Contains(const Rectangle* rec);
 	bool IsOverlap(Rectangle* rec);
 
     void Set(const Rectangle& rectangle);
@@ -166,6 +170,8 @@ public:
 	double RR_y1;
 	double RR_ys;
 
+	vector<TreeNode*> tmp_sorted_children;
+
 
 public:
 
@@ -192,6 +198,9 @@ public:
 
 	TreeNode* SplitInLoc(TreeNode* tree_node, int loc);
 	TreeNode* InsertInLoc(TreeNode* tree_node, int loc, Rectangle* rec);
+	TreeNode* InsertInSortedLoc(TreeNode* tree_node, int sorted_loc, Rectangle* rec);
+
+
 
     //Rectangle MergeRectangleList(const vector<pair<double, Rectangle> >& rectangle_list, double min_value);
 
@@ -208,6 +217,8 @@ public:
     TreeNode* CreateNode();
 
 
+    void SortChildrenByArea(TreeNode* tree_node);
+    void SortChildrenByMarginArea(TreeNode* tree_node, Rectangle* rec);
 	int Query(Rectangle& rectangle);
 	void GetSplitStates(TreeNode* tree_node, double* states);
 	void GetInsertStates(TreeNode* tree_node, Rectangle* rec, double* states);
@@ -216,6 +227,9 @@ public:
 	void GetInsertStates6(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates7(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates7Fill0(TreeNode* tree_node, Rectangle* rec, double* states);
+	void GetSortedInsertStates(TreeNode* tree_node, Rectangle* rec, double* states, int topk, INSERT_STATE_TYPE state_type);
+	int GetNumberOfEnlargedChildren(TreeNode* tree_node, Rectangle* rec);
+
 	int GetMinAreaContainingChild(TreeNode* tree_node, Rectangle* rec);
 	int GetMinAreaEnlargementChild(TreeNode* tree_node, Rectangle* rec);
 	int GetMinMarginIncrementChild(TreeNode* tree_node, Rectangle* rec);
@@ -247,6 +261,8 @@ extern "C"{
 	void RetrieveSpecialInsertStates7(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 	void RetrieveSpecialInsertStates7Fill0(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 
+	void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, int topk, int state_type, double* states);
+
 	RTree* ConstructTree(int max_entry, int min_entry);
 
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
@@ -257,6 +273,8 @@ extern "C"{
 	int GetMinAreaEnlargementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 	int GetMinMarginIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 	int GetMinOverlapIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
+
+	int GetNumberOfEnlargedChildren(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 
 	int GetQueryResult(RTree* rtree);
 	
@@ -277,6 +295,7 @@ extern "C"{
 	int TryInsert(RTree* rtree, Rectangle* rec);
 
 	TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* rec);
+	TreeNode* InsertWithSortedLoc(RTree* tree, TreeNode* tree_node, int sorted_loc, Rectangle* rec);
 
 	void DefaultInsert(RTree* rtree, Rectangle* rec);
 

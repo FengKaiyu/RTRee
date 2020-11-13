@@ -67,6 +67,9 @@ class RTree:
 		self.lib.RetrieveSpecialInsertStates7Fill0.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialInsertStates7Fill0.restype = ctypes.c_void_p
 
+		self.lib.RetrieveSortedInsertStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveSortedInsertStates.restype = ctypes.c_void_p
+
 		self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.GetMBR.restype = ctypes.c_void_p
 
@@ -84,6 +87,12 @@ class RTree:
 
 		self.lib.GetMinOverlapIncrementChild.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 		self.lib.GetMinOverlapIncrementChild.restype = ctypes.c_int
+
+		self.lib.InsertWithSortedLoc.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+		self.lib.InsertWithSortedLoc.restype = ctypes.c_void_p
+
+		self.lib.GetNumberOfEnlargedChildren.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+		self.lib.GetNumberOfEnlargedChildren.restype = ctypes.c_int
 
 
 		self.lib.PrintTree.argtypes = [ctypes.c_void_p]
@@ -168,6 +177,15 @@ class RTree:
 	def PrepareRectangle(self, left, right, bottom, top):
 		self.rec = self.lib.InsertRec(self.tree, left, right, bottom, top)
 		self.ptr = self.lib.GetRoot(self.tree)
+
+
+
+
+	def GetNumberOfEnlargedChildren(self):
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		num = self.lib.GetNumberOfEnlargedChildren(self.tree, self.ptr, self.rec)
+		return num
 
 	def RetrieveSplitStates(self):
 		#if self.debug:
@@ -277,6 +295,17 @@ class RTree:
 		states = np.ctypeslib.as_array(state_c)
 		return states
 
+	def RetrieveSortedInsertStates(self, action_space, rl_type):
+		#action_space = 5 or 10
+		#rl_type=0: RL for enlarged children and deterministic for non-enlarged children.
+		#rl_type=1: RL for non-enlarged children and deterministic for enlarged children.
+		if self.lib.IsLeaf(self.ptr):
+			return None
+		state_length = 4 * action_space
+		state_c = (ctypes.c_double * state_length)()
+		self.lib.RetrieveSortedInsertStates(self.tree, self.ptr, self.rec, action_space, rl_type, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
 
 	def UniformRandomQuery(self, wr, hr):
 		boundary_c = (ctypes.c_double * 4)()
@@ -311,6 +340,14 @@ class RTree:
 
 	def InsertWithLoc(self, loc):
 		self.next_ptr = self.lib.InsertWithLoc(self.tree, self.ptr, loc, self.rec)
+		if self.lib.IsLeaf(self.ptr):
+			return True
+		else:
+			self.ptr = self.next_ptr
+			return False
+
+	def InsertWithSortedLoc(self, loc):
+		self.next_ptr = self.lib.InsertWithSortedLoc(self.tree, self.ptr, loc, self.rec)
 		if self.lib.IsLeaf(self.ptr):
 			return True
 		else:
@@ -428,30 +465,35 @@ if __name__ == '__main__':
 	tree = RTree(3, 1)
 	tree.SetInsertStrategy('INS_AREA')
 	tree.SetSplitStrategy('SPL_MIN_AREA')
+	loc = 0
 	for i in range(len(ls)):
 		#tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
 		tree.PrepareRectangle(ls[i], rs[i], bs[i], ts[i])
-		child = tree.GetMinAreaContainingChild()
-		print(ls[i], rs[i], bs[i], ts[i])
+		num = tree.GetNumberOfEnlargedChildren()
+		print('rectangle', ls[i], rs[i], bs[i], ts[i])
 		tree.Print()
-		print(tree.GetNodeBoundary())
-		child1 = tree.GetMinAreaEnlargementChild()
-		child2 = tree.GetMinMarginIncrementChild()
-		child3 = tree.GetMinOverlapIncrementChild()
-		print('child',child)
-		print(child1, child2, child3)
-		
-		states3 = tree.RetrieveSpecialInsertStates3()
-		states4 = tree.RetrieveSpecialInsertStates4()
-		states6 = tree.RetrieveSpecialInsertStates6() #叶节点retrieve 的state是None
-		states7 = tree.RetrieveSpecialInsertStates7()
-		while states3 is not None and states6 is not None:
+		print(num, 'children are enlarged')
 
-			tree.InsertWithLoc(0)
-			states3 = tree.RetrieveSpecialInsertStates3()
-			states4 = tree.RetrieveSpecialInsertStates4()
-			states6 = tree.RetrieveSpecialInsertStates6()
-			states7 = tree.RetrieveSpecialInsertStates7()
+		states = tree.RetrieveSortedInsertStates(1, 0)
+		print('type 0 top 1 state', states)
+		states = tree.RetrieveSortedInsertStates(1, 1)
+		print('type 1 top 1 state', states)
+		states = tree.RetrieveSortedInsertStates(2, 0)
+		print('type 0 top 2 state', states)
+		states = tree.RetrieveSortedInsertStates(2, 1)
+		print('type 1 top 2 state', states)
+		while states is not None:
+			tree.InsertWithSortedLoc(loc)
+			loc = 1 - loc
+			states = tree.RetrieveSortedInsertStates(1, 0)
+			print('type 0 top 1 state', states)
+			states = tree.RetrieveSortedInsertStates(1, 1)
+			print('type 1 top 1 state', states)
+			states = tree.RetrieveSortedInsertStates(2, 0)
+			print('type 0 top 2 state', states)
+			states = tree.RetrieveSortedInsertStates(2, 1)
+			print('type 1 top 2 state', states)
+		
 		tree.InsertWithLoc(0)
 		
 

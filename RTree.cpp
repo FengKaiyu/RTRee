@@ -176,7 +176,7 @@ double MarginOvlpArea(const Rectangle* rectangle1, const Rectangle* obj, const R
 //	}
 //}
 
-bool Rectangle::Contains(Rectangle* rec) {
+bool Rectangle::Contains(const Rectangle* rec) {
 	if (left_ <= rec->left_ && rec->right_ <= right_ && bottom_ <= rec->bottom_ && top_ >= rec->top_) {
 		return true;
 	}
@@ -244,6 +244,10 @@ bool SortedByTop(const Rectangle* rec1, const Rectangle* rec2) {
 
 bool SortedByBottom(const Rectangle* rec1, const Rectangle* rec2) {
 	return rec1->bottom_ < rec2->bottom_;
+}
+
+bool CompareByArea(const Rectangle* rec1, const Rectangle* rec2){
+	return rec1->Area() < rec2->Area();
 }
 
 
@@ -573,6 +577,33 @@ TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* re
 	return next_node;
 }
 
+TreeNode* InsertWithSortedLoc(RTree* tree, TreeNode* tree_node, int sorted_loc, Rectangle* rec){
+	if(tree->tmp_sorted_children.empty()){
+		cout<<"Children haven't been sorted yet."<<endl;
+		exit(0);
+	}
+	TreeNode* next_node = tree->InsertInSortedLoc(tree_node, sorted_loc, rec);
+	tree->tmp_sorted_children.clear();
+	return next_node;
+}
+
+TreeNode* RTree::InsertInSortedLoc(TreeNode *tree_node, int sorted_loc, Rectangle *rec){
+	TreeNode* next_node = nullptr;
+	if(tree_node->is_leaf){
+		if(tree_node->entry_num == 0){
+			tree_node->Set(*rec);
+		}
+		else{
+			tree_node->Include(*rec);
+		}
+		tree_node->AddChildren(rec->id_);
+	}
+	else{
+		tree_node->Include(*rec);
+		next_node = tmp_sorted_children[sorted_loc];
+	}
+	return next_node;
+}
 
 TreeNode* RTree::InsertInLoc(TreeNode *tree_node, int loc, Rectangle *rec){
 	TreeNode* next_node = nullptr;
@@ -2837,6 +2868,139 @@ void RTree::SplitMARGINCost(TreeNode* tree_node, vector<double>& values, Rectang
 	values[4] = SplitOverlap(bounding_box1, bounding_box2) / tree_node->Area();
 }
 
+
+void RTree::SortChildrenByArea(TreeNode *tree_node){
+	tmp_sorted_children.clear();
+	if(!tree_node->is_leaf){
+		tmp_sorted_children.resize(tree_node->entry_num);
+		for(int i=0; i<tree_node->entry_num; i++){
+			tmp_sorted_children[i] = tree_nodes_[tree_node->children[i]];
+		}
+		sort(tmp_sorted_children.begin(), tmp_sorted_children.end(), CompareByArea);
+	}
+}
+
+void RTree::SortChildrenByMarginArea(TreeNode *tree_node, Rectangle* rec){
+	vector<pair<double, int> > margin_area_children;
+	Rectangle new_rectangle;
+	tmp_sorted_children.clear();
+	if(!tree_node->is_leaf){
+		margin_area_children.resize(tree_node->entry_num);
+		tmp_sorted_children.resize(tree_node->entry_num);
+		for(int i=0; i<tree_node->entry_num; i++){
+			int node_id = tree_node->children[i];
+			TreeNode* node = tree_nodes_[node_id];
+			new_rectangle.Set(*node);
+			new_rectangle.Include(*rec);
+			margin_area_children[i].first = new_rectangle.Area() - node->Area();
+			margin_area_children[i].second = node_id; 
+		}
+		sort(margin_area_children.begin(), margin_area_children.end());
+		for(int i=0; i<tree_node->entry_num; i++){
+			tmp_sorted_children[i] = tree_nodes_[margin_area_children[i].second];
+		}
+	}
+}
+
+int RTree::GetNumberOfEnlargedChildren(TreeNode *tree_node, Rectangle *rec){
+	int enlarged_children_num = 0;
+	for(int i=0; i<tree_node->entry_num; i++){
+		TreeNode* child = tree_nodes_[tree_node->children[i]];
+		if(!child->Contains(rec)){
+			enlarged_children_num += 1;
+		}
+	}
+	return enlarged_children_num;
+}
+
+void RTree::GetSortedInsertStates(TreeNode *tree_node, Rectangle *rec, double *states, int topk, INSERT_STATE_TYPE state_type){
+	int dimension = topk * 4;
+	for(int i=0; i<dimension; i++){
+		states[i] = 0;
+	}
+	Rectangle new_rectangle;
+	double area_normalize = -DBL_MAX;
+	double margin_normalize = -DBL_MAX;
+	double overlap_normalize = - DBL_MAX;
+	double occupancy_normalize = -DBL_MAX;
+	for(int i=0; i<tmp_sorted_children.size(); i++){
+		if(i == topk)break;
+		TreeNode* node = tmp_sorted_children[i];
+		int loc = i * 4;
+		switch(state_type){
+			case RL_FOR_CONTAINING_CHILDREN:{
+				states[loc] = node->Area();
+				states[loc+1] = node->Perimeter();
+				states[loc+2] = 0;
+				for(int j=0; j<tmp_sorted_children.size(); j++){
+					if(i==j)continue;
+					TreeNode* another = tmp_sorted_children[j];
+					states[loc+2] += SplitOverlap(*node, *another);
+				}
+				states[loc+3] = 1.0 * node->entry_num / TreeNode::maximum_entry;
+				break;
+			}
+			case RL_FOR_ENLARGED_CHILDREN:{
+				new_rectangle.Set(*node);
+				new_rectangle.Include(*rec);
+				states[loc] = new_rectangle.Area() - node->Area();
+				states[loc+1] = new_rectangle.Perimeter() - node->Perimeter();
+				double old_overlap = 0, new_overlap = 0;
+				for(int j=0; j<tmp_sorted_children.size(); j++){
+					if(i == j)continue;
+					TreeNode* another = tmp_sorted_children[j];
+					old_overlap += SplitOverlap(*node, *another);
+					new_overlap += SplitOverlap(new_rectangle, *another);
+				}
+				states[loc+2] = new_overlap - old_overlap;
+				states[loc+3] = 1.0 * node->entry_num / TreeNode::maximum_entry;
+				break;
+			}
+		}
+		if(states[loc] > area_normalize){
+			area_normalize = states[loc];
+		}
+		if(states[loc+1] > margin_normalize){
+			margin_normalize = states[loc+1];
+		}
+		if(states[loc+2] > overlap_normalize){
+			overlap_normalize = states[loc+2];
+		}
+		if(states[loc+3] > occupancy_normalize){
+			occupancy_normalize = states[loc+3];
+		}
+	}
+	if(tmp_sorted_children.size() < topk){
+		for(int i = tree_node->entry_num; i < topk; i++){
+			int loc = i * 4;
+			int copy_loc = (i % tree_node->entry_num);
+			for(int j=0; j<4; j++){
+				states[loc+j] = states[copy_loc + j];
+			}
+		}
+	}
+	for(int i=0; i<dimension; i++){
+		switch(i%4){
+			case 0:{
+				states[i] = states[i] / (area_normalize + 0.001);
+				break;
+			}
+			case 1:{
+				states[i] = states[i] / (margin_normalize + 0.001);
+				break;
+			}
+			case 2:{
+				states[i] = states[i] / (overlap_normalize + 0.001);
+				break;
+			}
+			case 3:{
+				states[i] = states[i] / (occupancy_normalize + 0.001);
+				break;
+			}
+		}
+	}
+}
+
 void RTree::SplitOVERLAPCost(TreeNode* tree_node, vector<double>& values, Rectangle& bounding_box1, Rectangle& bounding_box2) {
 	double minimum_overlap = DBL_MAX;
 	double minimum_area = DBL_MAX;
@@ -3392,6 +3556,24 @@ int GetMinAreaContainingChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec)
 	return rtree->GetMinAreaContainingChild(tree_node, rec);
 }
 
+
+void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, int topk, int state_type, double* states){
+	switch(state_type){
+		case 0:{
+			//RL_FOR_ENLARGED_CHILDREN, deterministic for containing children
+			tree->SortChildrenByMarginArea(tree_node, rec);
+			tree->GetSortedInsertStates(tree_node, rec, states, topk, RL_FOR_ENLARGED_CHILDREN);
+			break;
+		}
+		case 1:{
+			//RL_FOR_CONTAINING_CHILDREN, deterministic for enlarged children
+			tree->SortChildrenByArea(tree_node);
+			tree->GetSortedInsertStates(tree_node, rec, states, topk, RL_FOR_CONTAINING_CHILDREN);
+			break;
+		}
+	}
+}
+
 void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states) {
 	tree->GetSplitStates(tree_node, states);
 }
@@ -3668,4 +3850,8 @@ int GetMinMarginIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec
 }
 int GetMinOverlapIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
 	return rtree->GetMinOverlapIncrementChild(tree_node, rec);
+}
+
+int GetNumberOfEnlargedChildren(RTree* rtree, TreeNode* tree_node, Rectangle* rec){
+	return rtree->GetNumberOfEnlargedChildren(tree_node, rec);
 }
