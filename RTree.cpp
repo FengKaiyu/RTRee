@@ -573,6 +573,9 @@ TreeNode* SplitWithLoc(RTree* tree, TreeNode* tree_node, int loc) {
 
 TreeNode* InsertWithLoc(RTree* tree, TreeNode* tree_node, int loc, Rectangle* rec){
 	//cout<<"insert with loc invoked"<<endl;
+	if(tree_node->entry_num > 0){
+		loc = loc % tree_node->entry_num;
+	}
 	TreeNode* next_node = tree->InsertInLoc(tree_node, loc, rec);
 	return next_node;
 }
@@ -581,6 +584,9 @@ TreeNode* InsertWithSortedLoc(RTree* tree, TreeNode* tree_node, int sorted_loc, 
 	if(tree->tmp_sorted_children.empty()){
 		cout<<"Children haven't been sorted yet."<<endl;
 		exit(0);
+	}
+	if(tree->tmp_sorted_children.size() > 0){
+		sorted_loc = sorted_loc % tree->tmp_sorted_children.size();
 	}
 	TreeNode* next_node = tree->InsertInSortedLoc(tree_node, sorted_loc, rec);
 	tree->tmp_sorted_children.clear();
@@ -2973,7 +2979,7 @@ void RTree::GetSortedInsertStates(TreeNode *tree_node, Rectangle *rec, double *s
 	if(tmp_sorted_children.size() < topk){
 		for(int i = tree_node->entry_num; i < topk; i++){
 			int loc = i * 4;
-			int copy_loc = (i % tree_node->entry_num);
+			int copy_loc = (i % tree_node->entry_num) * 4;
 			for(int j=0; j<4; j++){
 				states[loc+j] = states[copy_loc + j];
 			}

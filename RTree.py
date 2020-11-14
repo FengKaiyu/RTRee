@@ -493,10 +493,10 @@ if __name__ == '__main__':
 			print('type 0 top 2 state', states)
 			states = tree.RetrieveSortedInsertStates(2, 1)
 			print('type 1 top 2 state', states)
-		
+		input()
 		tree.InsertWithLoc(0)
 		
-
+		input()
 
 		tree.DefaultSplit()
 
