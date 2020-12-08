@@ -200,7 +200,7 @@ bool Rectangle::IsOverlap(Rectangle* rec) {
 	double left = max(left_, rec->left_);
 	double right = min(right_, rec->right_);
 	double bottom = max(bottom_, rec->bottom_);
-	double top = max(top_, rec->top_);
+	double top = min(top_, rec->top_);
 	if (left < right && bottom < top) {
 		return true;
 	}
@@ -2344,12 +2344,127 @@ void RTree::GetInsertStates(TreeNode *tree_node, Rectangle* rec, double *states)
 	}
 }
 
+void RTree::GetShortSplitStates(TreeNode* tree_node, double* states) {
+	int size = TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2;
+	double max_area = -DBL_MAX;
+	double max_perimeter = -DBL_MAX;
+	double max_overlap = -DBL_MAX;
+	double min_area = DBL_MAX;
+	double min_perimeter = DBL_MAX;
+	double min_overlap = DBL_MAX;
+	if (tree_node->is_leaf) {
+		vector<Rectangle*> recs(tree_node->entry_num);
+		for (int i = 0; i < tree_node->entry_num; i++) {
+			recs[i] = objects_[tree_node->children[i]];
+		}
+		sort(recs.begin(), recs.end(), SortedByLeft);
+		Rectangle prefix = MergeRange<Rectangle>(recs, 0, TreeNode::minimum_entry - 1);
+		Rectangle suffix = MergeRange<Rectangle>(recs, TreeNode::maximum_entry - TreeNode::minimum_entry + 1, recs.size());
+		//cout << "minimum_entry-1: " << TreeNode::minimum_entry - 1 << " maximum_entry - minimum_entry+1: " << TreeNode::maximum_entry - TreeNode::minimum_entry + 1 << endl;
+		int loc = 0;
+		for (int i = TreeNode::minimum_entry - 1; i < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; i++) {
+			prefix.Include(*recs[i]);
+			Rectangle remaining(suffix);
+			for (int j = i + 1; j < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; j++) {
+				remaining.Include(*recs[j]);
+			}
+			states[loc] = prefix.Area();
+			//cout << "states[" << loc << "] = " << prefix.Area() << endl;;
+			loc += 1;
+			states[loc] = remaining.Area();
+			//cout << "states[" << loc << "] = " << remaining.Area() << endl;;
+			loc += 1;
+			states[loc] = prefix.Perimeter();
+			//cout << "states[" << loc << "] = " << prefix.Perimeter() << endl;;
+			loc += 1;
+			states[loc] = remaining.Perimeter();
+			//cout << "states[" << loc << "] = " << remaining.Perimeter() << endl;;
+			loc += 1;
+			states[loc] = SplitOverlap(prefix, remaining);
+			//cout << "states[" << loc << "] = " << SplitOverlap(prefix, remaining) << endl;;
+			loc += 1;
+			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
+			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
+			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
+		}
+	}
+	else {
+		vector<TreeNode*> nodes(tree_node->entry_num);
+		for (int i = 0; i < tree_node->entry_num; i++) {
+			nodes[i] = tree_nodes_[tree_node->children[i]];
+		}
+		int loc = 0;
+		sort(nodes.begin(), nodes.end(), SortedByLeft);
+		Rectangle prefix = MergeRange<TreeNode>(nodes, 0, TreeNode::minimum_entry - 1);
+		Rectangle suffix = MergeRange<TreeNode>(nodes, TreeNode::maximum_entry - TreeNode::minimum_entry + 1, nodes.size());
+		for (int i = TreeNode::minimum_entry - 1; i < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; i++) {
+			prefix.Include(*nodes[i]);
+			Rectangle remaining(suffix);
+			for (int j = i + 1; j < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; j++) {
+				remaining.Include(*nodes[j]);
+			}
+			states[loc] = prefix.Area();
+			//cout << "states[" << loc << "] = " << prefix.Area() << endl;;
+			loc += 1;
+			states[loc] = remaining.Area();
+			//cout << "states[" << loc << "] = " << remaining.Area() << endl;;
+			loc += 1;
+			states[loc] = prefix.Perimeter();
+			//cout << "states[" << loc << "] = " << prefix.Perimeter() << endl;;
+			loc += 1;
+			states[loc] = remaining.Perimeter();
+			//cout << "states[" << loc << "] = " << remaining.Perimeter() << endl;;
+			loc += 1;
+			states[loc] = SplitOverlap(prefix, remaining);
+			//cout << "states[" << loc << "] = " << SplitOverlap(prefix, remaining) << endl;;
+			loc += 1;
+			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
+			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
+			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
+		}
+	}
+	for (int i = 0; i < 5 * size; i++) {
+		switch (i % 5) {
+		case 0: {
+			states[i] = (states[i] - min_area) / (max_area - min_area + 0.01);
+			break;
+		}
+		case 1: {
+			states[i] = (states[i] - min_area) / (max_area - min_area + 0.01);
+			break;
+		}
+		case 2: {
+			states[i] = (states[i] - min_perimeter) / (max_perimeter - min_perimeter + 0.01);
+			break;
+		}
+		case 3: {
+			states[i] = (states[i] - min_perimeter) / (max_perimeter - min_perimeter + 0.01);
+			break;
+		}
+		case 4: {
+			states[i] = (states[i] - min_overlap) / (max_overlap - min_overlap + 0.01);
+			break;
+		}
+		}
+
+	}
+}
+
 void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 	int size_per_dim = TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2;
 	//cout << "size_per_dim " << size_per_dim << endl;
 	double max_area = -DBL_MAX;
 	double max_perimeter = -DBL_MAX;
 	double max_overlap = -DBL_MAX;
+	double min_area = DBL_MAX;
+	double min_perimeter = DBL_MAX;
+	double min_overlap = DBL_MAX;
 	if (tree_node->is_leaf) {
 		vector<Rectangle*> recs(tree_node->entry_num);
 		for (int i = 0; i < tree_node->entry_num; i++) {
@@ -2384,6 +2499,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		
 		}
 		
@@ -2414,6 +2532,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		sort(recs.begin(), recs.end(), SortedByBottom);
 		prefix = MergeRange<Rectangle>(recs, 0, TreeNode::minimum_entry - 1);
@@ -2442,6 +2563,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		sort(recs.begin(), recs.end(), SortedByTop);
 		prefix = MergeRange<Rectangle>(recs, 0, TreeNode::minimum_entry - 1);
@@ -2470,6 +2594,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		
 	}
@@ -2506,6 +2633,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		sort(nodes.begin(), nodes.end(), SortedByRight);
 		prefix = MergeRange<TreeNode>(nodes, 0, TreeNode::minimum_entry - 1);
@@ -2534,6 +2664,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		sort(nodes.begin(), nodes.end(), SortedByBottom);
 		prefix = MergeRange<TreeNode>(nodes, 0, TreeNode::minimum_entry - 1);
@@ -2562,6 +2695,9 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 		sort(nodes.begin(), nodes.end(), SortedByTop);
 		prefix = MergeRange<TreeNode>(nodes, 0, TreeNode::minimum_entry - 1);
@@ -2590,28 +2726,31 @@ void RTree::GetSplitStates(TreeNode* tree_node, double* states) {
 			max_area = max(max_area, max(prefix.Area(), remaining.Area()));
 			max_perimeter = max(max_perimeter, max(prefix.Perimeter(), remaining.Perimeter()));
 			max_overlap = max(max_overlap, SplitOverlap(prefix, remaining));
+			min_area = min(min_area, min(prefix.Area(), remaining.Area()));
+			min_perimeter = min(min_perimeter, min(prefix.Perimeter(), remaining.Perimeter()));
+			min_overlap = min(min_overlap, SplitOverlap(prefix, remaining));
 		}
 	}
 	for (int i = 0; i < 240; i++) {
 		switch (i % 5) {
 		case 0: {
-			states[i] = states[i] / (max_area + 0.01);
+			states[i] = (states[i] - min_area) / (max_area - min_area + 0.01);
 			break;
 		}
 		case 1: {
-			states[i] = states[i] / (max_area + 0.01);
+			states[i] = (states[i] - min_area) / (max_area - min_area + 0.01);
 			break;
 		}
 		case 2: {
-			states[i] = states[i] / (max_perimeter + 0.01);
+			states[i] = (states[i] - min_perimeter)/ (max_perimeter - min_perimeter + 0.01);
 			break;
 		}
 		case 3: {
-			states[i] = states[i] / (max_perimeter + 0.01);
+			states[i] = (states[i] - min_perimeter) / (max_perimeter - min_perimeter + 0.01);
 			break;
 		}
 		case 4: {
-			states[i] = states[i] / (max_overlap + 0.01);
+			states[i] = (states[i] - min_overlap)/ (max_overlap - min_overlap + 0.01);
 			break;
 		}
 
@@ -3580,6 +3719,10 @@ void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec
 	}
 }
 
+void RetrieveShortSplitStates(RTree* tree, TreeNode* tree_node, double* states) {
+	tree->GetShortSplitStates(tree_node, states);
+}
+
 void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states) {
 	tree->GetSplitStates(tree_node, states);
 }
@@ -3793,6 +3936,24 @@ void DefaultInsert(RTree* rtree, Rectangle* rec) {
 
 int TotalTreeNode(RTree* rtree) {
 	return (int)rtree->tree_nodes_.size();
+}
+
+double AverageNodeArea(RTree* rtree){
+	double area = 0;
+	int total_num = (int)rtree->tree_nodes_.size();
+	for(int i=0; i<total_num; i++){
+		area += rtree->tree_nodes_[i]->Area() / total_num;
+	}
+	return area;
+}
+
+double AverageNodeChildren(RTree* rtree){
+	double average_children = 0;
+	int total_num = (int)rtree->tree_nodes_.size();
+	for(int i=0; i<total_num; i++){
+		average_children += 1.0 * rtree->tree_nodes_[i]->entry_num / total_num;
+	}
+	return average_children;
 }
 
 int TreeHeight(RTree* rtree){

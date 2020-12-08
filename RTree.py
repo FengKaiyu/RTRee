@@ -49,6 +49,9 @@ class RTree:
 		self.lib.RetrieveSpecialStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialStates.restype = ctypes.c_void_p
 
+		self.lib.RetrieveShortSplitStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+		self.lib.RetrieveShortSplitStates.restype = ctypes.c_void_p
+
 		self.lib.RetrieveSpecialInsertStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
 		self.lib.RetrieveSpecialInsertStates.restype = ctypes.c_void_p
 
@@ -115,6 +118,12 @@ class RTree:
 
 		self.lib.Clear.argtypes = [ctypes.c_void_p]
 		self.lib.Clear.restype = ctypes.c_void_p
+
+		self.lib.AverageNodeArea.argtypes = [ctypes.c_void_p]
+		self.lib.AverageNodeArea.restype = ctypes.c_double
+
+		self.lib.AverageNodeChildren.argtypes = [ctypes.c_void_p]
+		self.lib.AverageNodeChildren.restype = ctypes.c_double
 
 		self.lib.TotalTreeNode.argtypes = [ctypes.c_void_p]
 		self.lib.TotalTreeNode.restype = ctypes.c_int
@@ -202,6 +211,16 @@ class RTree:
 		is_valid = self.lib.RetrieveStates(self.tree, self.ptr, state_c)
 		states = np.ctypeslib.as_array(state_c)
 		return states, is_valid
+
+	def RetrieveShortSplitStates(self):
+		is_overflow = self.lib.IsOverflow(self.ptr)
+		if is_overflow == 0:
+			return None
+		state_length = 5 * 12
+		state_c = (ctypes.c_double * state_length)()
+		self.lib.RetrieveShortSplitStates(self.tree, self.ptr, state_c)
+		states = np.ctypeslib.as_array(state_c)
+		return states
 
 	def RetrieveSpecialSplitStates(self):
 
@@ -371,6 +390,14 @@ class RTree:
 			input()
 		return 1.0 * node_access / height #total_node
 
+	def AverageNodeArea(self):
+		return self.lib.AverageNodeArea(self.tree)
+
+	def AverageNodeChildren(self):
+		return self.lib.AverageNodeChildren(self.tree)
+
+	def TotalTreeNodeNum(self):
+		return self.lib.TotalTreeNode(self.tree)
 
 	def DefaultInsert(self, boundary):
 		self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])

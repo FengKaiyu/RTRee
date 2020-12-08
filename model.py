@@ -47,7 +47,7 @@ parser.add_argument('-max_entry', type=int, help='maximum entry a node can hold'
 parser.add_argument('-query_for_reward', type=int, help='number of query used for reward', default=5)
 parser.add_argument('-splits_for_update', type=int, help='number of splits for a reward computation', default=20)
 parser.add_argument('-parts', type=int, help='number of parts to train', default=5)
-parser.add_argument('-network', choices=['strategy', 'spl_loc'], help='which network is used for training', default='strategy')
+parser.add_argument('-network', choices=['strategy', 'spl_loc', 'spl_loc_short'], help='which network is used for training', default='strategy')
 
 class DQN(nn.Module):
 	def __init__(self, input_dimension, inter_dimension, output_dimension):
@@ -139,6 +139,10 @@ class SplitLearner:
 		if self.config.network == 'spl_loc':
 			self.network = DQN2()
 			self.target_network = DQN2()
+        if self.config.network == 'spl_loc_short':
+            self.network = DQN2(60, 60, 12)
+            self.target_network = DQN2(60, 60, 12)
+
 
 		self.target_network.load_state_dict(self.network.state_dict())
 		self.target_network.eval()
@@ -320,6 +324,9 @@ class SplitLearner:
 				states = self.tree.RetrieveSpecialSplitStates()
 			object_boundary = self.NextObj()
 		#self.tree.PrintEntryNum()
+		print('average tree node area: ', self.tree.AverageNodeArea())
+		print('average tree node children: ', self.tree.AverageNodeChildren())
+		print('total tree nodes: ', self.tree.TotalTreeNodeNum())
 		node_access = 0
 		query_num = 0
 		query = self.NextQuery()
@@ -376,6 +383,7 @@ class SplitLearner:
 			object_boundary = self.NextObj()
 		self.tree.PrintEntryNum()
 
+
 		node_access = 0
 		query_num = 0
 		query = self.NextQuery()
@@ -405,7 +413,30 @@ class SplitLearner:
 			query = self.NextQuery()
 		return 1.0 * node_access / query_num
 
+	def Train5(self):
+        #TODO: use teacher forcing
+		start_time = time.time()
+		loss_log = open("./log/{}.loss".format(self.id), 'w')
+		reward_log = open("./log/{}.reward".format(self.id), "w")
+		steps = []
+		object_num = 0
+		self.ResetObjLoader()
+		object_boundary = self.NextObj()
+		cache_tree = RTree(self.config.max_entry, int(0.4 * self.config.max_entry))
+		cache_tree.SetInsertStrategy(self.config.default_ins_strategy)
+		cache_tree.SetSplitStrategy(self.config.default_spl_strategy)
+
+		while object_boundary is not None:
+			object_num += 1
+			object_boundary = self.NextObj()
+		objects_for_train = 0
+		for epoch in range(self.config.epoch):
+			e = 0
+			self.ResetObjLoader()
+			self.tree.Clear()
+			self.reference_tree.Clear()
 	def Train4(self):
+        # learn which location to split
 		start_time = time.time()
 		loss_log = open("./log/{}.loss".format(self.id), 'w')
 		reward_log = open("./log/{}.reward".format(self.id), "w")
@@ -483,7 +514,6 @@ class SplitLearner:
 
 				if period == self.config.splits_for_update:
 					reward = self.ComputeDenseRewardForList(obj_list_for_reward)
-					#print('reward', reward)
 					reward_log.write('{}\n'.format(reward))
 					for i in range(len(steps) - 1):
 						if steps[i][1] is None:

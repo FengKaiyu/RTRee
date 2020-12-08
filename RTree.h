@@ -221,6 +221,7 @@ public:
     void SortChildrenByMarginArea(TreeNode* tree_node, Rectangle* rec);
 	int Query(Rectangle& rectangle);
 	void GetSplitStates(TreeNode* tree_node, double* states);
+	void GetShortSplitStates(TreeNode* tree_node, double* states);
 	void GetInsertStates(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates3(TreeNode* tree_node, Rectangle* rec, double* states);
 	void GetInsertStates4(TreeNode* tree_node, Rectangle* rec, double* states);
@@ -253,6 +254,7 @@ extern "C"{
 	int RetrieveStates(RTree* tree, TreeNode* tree_node, double* states);
 
 	void RetrieveSpecialStates(RTree* tree, TreeNode* tree_node, double* states);
+	void RetrieveShortSplitStates(RTree* tree, TreeNode* tree_node, double* states);
 
 	void RetrieveSpecialInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
 	void RetrieveSpecialInsertStates3(RTree* tree, TreeNode* tree_node, Rectangle* rec, double* states);
@@ -325,6 +327,8 @@ extern "C"{
 	void PrintEntryNum(RTree* rtree);
 
 	int TotalTreeNode(RTree* rtree);
+	double AverageNodeArea(RTree* rtree);
+	double AverageNodeChildren(RTree* rtree);
 	int TreeHeight(RTree* rtree);
 
 	void SetDebug(RTree* rtree, int value);
