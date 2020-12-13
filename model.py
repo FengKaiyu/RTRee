@@ -99,6 +99,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
 class SplitLearner:
+<<<<<<< HEAD
     def __init__(self):
         self.tree = None
         self.reference_tree = None
@@ -1009,7 +1010,6 @@ class SplitLearner:
         train_log.close()
         loss_log.close()
         debug_log.close()
-
 
 
 if __name__ == '__main__':
