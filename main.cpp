@@ -16,9 +16,8 @@ void TestBaseline(int insert_strategy, int split_strategy) {
 	SetDefaultInsertStrategy(tree, insert_strategy);
 	SetDefaultSplitStrategy(tree, split_strategy);
 	int total_access = 0;
-	ifstream ifs("./dataset/skew1000k.txt", std::ifstream::in);
+	ifstream ifs("./dataset/skew100k.txt", std::ifstream::in);
 	for (int i = 0; i < 100000; i++) {
-		cout<<"i: "<<i<<endl;
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
 		Rectangle* rectangle = InsertRec(tree, l, r, b, t);
@@ -26,19 +25,21 @@ void TestBaseline(int insert_strategy, int split_strategy) {
 		//int split_strategy = rand() % 5;
 		//SetDefaultSplitStrategy(tree, split_strategy);
 		
-		//DefaultInsert(tree, rectangle);
-		TreeNode* node = RRInsert(tree, rectangle);
+		DefaultInsert(tree, rectangle);
+		//TreeNode* node = RRInsert(tree, rectangle);
 
 		//DirectSplit(tree, node);
-		cout<<"isnerted"<<endl;
-		RRSplit(tree, node);
-		cout<<"splitted"<<endl;
+		//cout<<"isnerted"<<endl;
+		//RRSplit(tree, node);
+		//cout<<"splitted"<<endl;
 	}
+	cout<<"average node area: "<<AverageNodeArea(tree)<<endl;
+	cout<<"average node entry_num: "<<AverageNodeChildren(tree)<<endl;
+	cout<<"total tree node num: "<<TotalTreeNode(tree)<<endl;
 	ifs.close();
 	ifs.open("./dataset/query1k.txt", std::ifstream::in);
 	ofstream ofs("base.txt", std::ofstream::out);
 	for (int i = 0; i < 1000; i++) {
-		cout<<"query "<<i<<endl;
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
 		int node_access = QueryRectangle(tree, l, r, b, t);
@@ -56,7 +57,6 @@ int main() {
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 5; j++) {
 			TestBaseline(i, j);
-			exit(0);
 		}
 	}
 	return 0;	
