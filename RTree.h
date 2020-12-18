@@ -11,6 +11,7 @@
 #include<cmath>
 #include<assert.h>
 #include<iostream>
+#include<fstream>
 
 using std::list;
 using std::vector;
@@ -24,6 +25,7 @@ using std::cout;
 using std::ceil;
 using std::endl;
 using std::exp;
+using std::ofstream;
 
 
 
@@ -169,10 +171,10 @@ public:
 	double RR_s;
 	double RR_y1;
 	double RR_ys;
+	int ff_cnt = 1;
 
 	vector<TreeNode*> tmp_sorted_children;
 	vector<pair<double, pair<bool, int> > > sorted_split_loc;
-
 
 public:
 
@@ -306,6 +308,10 @@ extern "C"{
 	TreeNode* InsertWithSortedLoc(RTree* tree, TreeNode* tree_node, int sorted_loc, Rectangle* rec);
 	TreeNode* SplitWithSortedLoc(RTree* rtree, TreeNode* node, int sorted_loc);
 
+	int GetActualSplitLocFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc);
+	int GetActualSplitDimFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc);
+	void PrintSortedSplitLocs(RTree* rtree);
+
 	void DefaultInsert(RTree* rtree, Rectangle* rec);
 
 	void DefaultSplit(RTree* rtree, TreeNode* tree_node);
@@ -320,6 +326,8 @@ extern "C"{
 	TreeNode* SplitOneStep(RTree* rtree, TreeNode* node, int strategy);
 
 	TreeNode* SplitWithLoc(RTree* rtree, TreeNode* node, int loc);
+
+	void PrintTreeEntry(RTree* rtree);
 
 	int IsLeaf(TreeNode* node);
 	int IsOverflow(TreeNode* node);

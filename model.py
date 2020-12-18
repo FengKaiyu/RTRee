@@ -25,7 +25,7 @@ parser.add_argument('-reward_query_height', type=float, default=0.01)
 parser.add_argument('-default_ins_strategy', help='default insert strategy', default="INS_AREA")
 parser.add_argument('-default_spl_strategy', help='default split strategy', default='SPL_MIN_AREA')
 parser.add_argument('-reference_tree_ins_strategy', help='default insert strategy for reference tree', default="INS_AREA")
-parser.add_argument('-reference_tree_spl_strategy', help='default split strategy for reference tree', default='SPL_MIN_AREA')
+parser.add_argument('-reference_tree_spl_strategy', help='default split strategy for reference tree', default='SPL_MIN_MARGIN')
 parser.add_argument('-action_space', type=int, help='number of possible actions', default=5)
 parser.add_argument('-batch_size', type=int, help='batch_size', default=64)
 parser.add_argument('-state_dim', type=int, help='input dimension', default=25)
@@ -331,7 +331,6 @@ class SplitLearner:
                 states = torch.tensor(states, dtype=torch.float32)
                 q_values = self.network(states)
                 action = torch.argmax(q_values).item()
-                action = 0
                 if self.config.network == 'sort_spl_loc':
                     success = self.tree.SplitWithSortedLoc(action)
                 else:
@@ -352,14 +351,16 @@ class SplitLearner:
         query = self.NextQuery()
         f = open('debug.result.log', 'w')
         f2 = open('reference.result.log', 'w')
+        reference_node_access = 0.0
         while query is not None:
             node_access += self.tree.Query(query)
             f.write('{}\n'.format(self.tree.QueryResult()))
-            self.reference_tree.Query(query)
+            reference_node_access += self.reference_tree.Query(query)
             f2.write('{}\n'.format(self.reference_tree.QueryResult()))
             query_num += 1
             query = self.NextQuery()
         print('average node access is ', node_access / query_num)
+        print('reference node access is ', reference_node_access/query_num)
         f.close()
         f2.close()
         return 1.0 * node_access / query_num
@@ -454,7 +455,6 @@ class SplitLearner:
         while object_boundary is not None:
             object_num += 1
             object_boundary = self.NextObj()
-
         for epoch in trange(self.config.epoch, desc='Epoch'):
             e = 0
             part_trange = trange(self.config.parts, desc='With parts')

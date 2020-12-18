@@ -225,25 +225,57 @@ bool Rectangle::IsOverlap(Rectangle* rec) {
 
 
 bool SortedByLeft(const Rectangle* rec1, const Rectangle* rec2) {
-	return rec1->left_ < rec2->left_;
+	if(rec1->left_ < rec2->left_)return true;
+	if(rec1->left_ > rec2->left_)return false;
+	if(rec1->right_ < rec2->right_)return true;
+	if(rec1->right_ > rec2->right_)return false;
+	if(rec1->bottom_ < rec2->bottom_)return true;
+	if(rec1->bottom_ > rec2->bottom_)return false;
+	if(rec1->top_ < rec2->top_)return true;
+	if(rec1->top_ > rec2->top_)return false;
+	return rec1->id_ < rec2->id_;
 }
 
 
 
 bool SortedByRight(const Rectangle* rec1, const Rectangle* rec2) {
-	return rec1->right_ < rec2->right_;
+	if(rec1->right_ < rec2->right_)return true;
+	if(rec1->right_ > rec2->right_)return false;
+	if(rec1->left_ < rec2->left_)return true;
+	if(rec1->left_ > rec2->left_)return false;
+	if(rec1->bottom_ < rec2->bottom_)return true;
+	if(rec1->bottom_ > rec2->bottom_)return false;
+	if(rec1->top_ < rec2->top_)return true;
+	if(rec1->top_ > rec2->top_)return false;
+	return rec1->id_ < rec2->id_;
 }
 
 
 
 bool SortedByTop(const Rectangle* rec1, const Rectangle* rec2) {
-	return rec1->top_ < rec2->top_;
+	if(rec1->top_ < rec2->top_)return true;
+	if(rec1->top_ > rec2->top_)return false;
+	if(rec1->bottom_ < rec2->bottom_)return true;
+	if(rec1->bottom_ > rec2->bottom_)return false;
+	if(rec1->left_ < rec2->left_)return true;
+	if(rec1->left_ > rec2->left_)return false;
+	if(rec1->right_ < rec2->right_)return true;
+	if(rec1->right_ > rec2->right_)return false;
+	return rec1->id_ < rec2->id_;
 }
 
 
 
 bool SortedByBottom(const Rectangle* rec1, const Rectangle* rec2) {
-	return rec1->bottom_ < rec2->bottom_;
+	if(rec1->bottom_ < rec2->bottom_)return true;
+	if(rec1->bottom_ > rec2->bottom_)return false;
+	if(rec1->top_ < rec2->top_)return true;
+	if(rec1->top_ > rec2->top_)return false;
+	if(rec1->left_ < rec2->left_)return true;
+	if(rec1->left_ > rec2->left_)return false;
+	if(rec1->right_ < rec2->right_)return true;
+	if(rec1->right_ > rec2->right_)return false;
+	return rec1->id_ < rec2->id_;
 }
 
 bool CompareByArea(const Rectangle* rec1, const Rectangle* rec2){
@@ -712,6 +744,8 @@ TreeNode* RTree::SplitInSortedLoc(TreeNode* tree_node, int sorted_loc){
 		}
 	}
 	sibling->Set(bounding_box2);
+
+	
 	tree_node->CopyChildren(new_child1);
 	if (!tree_node->is_leaf) {
 		for (int i = 0; i < new_child1.size(); i++) {
@@ -1098,7 +1132,6 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 				sort(children.begin(), children.end(), SortedByLeft);
 				Rectangle rec1;
 				Rectangle rec2;
-				
 				int split = FindMinimumSplit<TreeNode>(children, SplitArea, SplitOverlap, minimum_area, minimum_overlap, rec1, rec2);
 				if (split >= 0) {
 					child_treenode1.assign(children.begin(), children.begin() + split + 1);
@@ -1216,6 +1249,8 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 				Rectangle rec1;
 				Rectangle rec2;
 				//sort by left
+				int real_split=-1;
+				int real_dim = -1;
 				sort(children.begin(), children.end(), SortedByLeft);
 				int split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
 				if (split >= 0) {
@@ -1225,14 +1260,14 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 					bounding_box2.Set(rec2);
 				}
 				//sort by right
-				sort(children.begin(), children.end(), SortedByRight);
-				split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
-				if (split >= 0) {
-					child_treenode1.assign(children.begin(), children.begin() + split + 1);
-					child_treenode2.assign(children.begin() + split + 1, children.end());
-					bounding_box1.Set(rec1);
-					bounding_box2.Set(rec2);
-				}
+				//sort(children.begin(), children.end(), SortedByRight);
+				//split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
+				//if (split >= 0) {
+				//	child_treenode1.assign(children.begin(), children.begin() + split + 1);
+				//	child_treenode2.assign(children.begin() + split + 1, children.end());
+				//	bounding_box1.Set(rec1);
+				//	bounding_box2.Set(rec2);
+				//}
 				//sort by bottom
 				sort(children.begin(), children.end(), SortedByBottom);
 				split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
@@ -1243,14 +1278,14 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 					bounding_box2.Set(rec2);
 				}
 				//sort by top
-				sort(children.begin(), children.end(), SortedByTop);
-				split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
-				if (split >= 0) {
-					child_treenode1.assign(children.begin(), children.begin() + split + 1);
-					child_treenode2.assign(children.begin() + split + 1, children.end());
-					bounding_box1.Set(rec1);
-					bounding_box2.Set(rec2);
-				}
+				//sort(children.begin(), children.end(), SortedByTop);
+				//split = FindMinimumSplit<TreeNode>(children, SplitPerimeter, SplitOverlap, minimum_perimeter, minimum_overlap, rec1, rec2);
+				//if (split >= 0) {
+				//	child_treenode1.assign(children.begin(), children.begin() + split + 1);
+				//	child_treenode2.assign(children.begin() + split + 1, children.end());
+				//	bounding_box1.Set(rec1);
+				//	bounding_box2.Set(rec2);
+				//}
 				new_child1.resize(child_treenode1.size());
 				new_child2.resize(child_treenode2.size());
 				for (int i = 0; i < child_treenode1.size(); i++) {
@@ -1260,6 +1295,7 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 					new_child2[i] = child_treenode2[i]->id_;
 				}
 			}
+			
 			break;
 		}
 		case SPL_MIN_OVERLAP: {
@@ -1655,7 +1691,6 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
             }
 		}
 		sibling->Set(bounding_box2);
-
 		tree_node->CopyChildren(new_child1);
 		if(!tree_node->is_leaf){
             for (int i = 0; i < new_child1.size(); i++) {
@@ -1664,7 +1699,6 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
             }
 		}
 		tree_node->Set(bounding_box1);
-
 		if (tree_node->father >= 0) {
 			tree_nodes_[tree_node->father]->AddChildren(sibling);
 			tree_nodes_[tree_node->father]->Include(bounding_box2);
@@ -4125,6 +4159,20 @@ void PrintEntryNum(RTree* rtree) {
 	rtree->PrintEntryNum();
 }
 
+int GetActualSplitLocFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc){
+	return rtree->sorted_split_loc[sorted_loc].second.second;
+}
+int GetActualSplitDimFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc){
+	return 1 - (int)rtree->sorted_split_loc[sorted_loc].second.first;
+}
+
+void PrintSortedSplitLocs(RTree* rtree){
+	for(int i=0; i<rtree->sorted_split_loc.size(); i++){
+		cout<<"("<<rtree->sorted_split_loc[i].first<<" ["<<rtree->sorted_split_loc[i].second.first<<", "<<rtree->sorted_split_loc[i].second.second<<"]) ";
+	}
+	cout<<endl;
+
+}
 
 TreeNode* DirectInsert(RTree* rtree, Rectangle* rec) {
 	TreeNode* iter = rtree->Root();
@@ -4140,6 +4188,12 @@ TreeNode* DirectInsert(RTree* rtree, Rectangle* rec) {
 	return iter;
 }
 
+void PrintTreeEntry(RTree* rtree){
+	for(int i=0; i<rtree->tree_nodes_.size(); i++){
+		cout<<rtree->tree_nodes_[i]->entry_num<<" ";
+	}
+	cout<<endl;
+}
 
 
 TreeNode* RRInsert(RTree* rtree, Rectangle* rec){
@@ -4210,7 +4264,6 @@ void DefaultSplit(RTree* rtree, TreeNode* tree_node){
 
 void DefaultInsert(RTree* rtree, Rectangle* rec) {
 	TreeNode* iter = rtree->Root();
-	
 	while (true) {
 		TreeNode* next_iter = rtree->InsertStepByStep(rec, iter);
 		if (next_iter != nullptr) {

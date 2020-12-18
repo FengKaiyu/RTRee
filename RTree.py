@@ -40,6 +40,9 @@ class RTree:
         self.lib.IsLeaf.argtypes = [ctypes.c_void_p]
         self.lib.IsLeaf.restype = ctypes.c_int
 
+        self.lib.PrintTreeEntry.argtypes = [ctypes.c_void_p]
+        self.lib.PrintTreeEntry.restype = ctypes.c_void_p
+
         self.lib.IsOverflow.argtypes = [ctypes.c_void_p]
         self.lib.IsOverflow.restype = ctypes.c_int
 
@@ -72,6 +75,12 @@ class RTree:
 
         self.lib.RetrieveSortedInsertStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSortedInsertStates.restype = ctypes.c_void_p
+
+        self.lib.GetActualSplitLocFromSortedPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+        self.lib.GetActualSplitLocFromSortedPos.restype = ctypes.c_int
+
+        self.lib.GetActualSplitDimFromSortedPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+        self.lib.GetActualSplitDimFromSortedPos.restype = ctypes.c_int
 
         self.lib.RetrieveSortedSplitStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSortedSplitStates.restype = ctypes.c_void_p
@@ -125,6 +134,9 @@ class RTree:
         self.lib.Clear.argtypes = [ctypes.c_void_p]
         self.lib.Clear.restype = ctypes.c_void_p
 
+        self.lib.PrintSortedSplitLocs.argtypes = [ctypes.c_void_p]
+        self.lib.PrintSortedSplitLocs.restype = ctypes.c_void_p
+
         self.lib.AverageNodeArea.argtypes = [ctypes.c_void_p]
         self.lib.AverageNodeArea.restype = ctypes.c_double
 
@@ -162,12 +174,21 @@ class RTree:
 
         self.debug = False
 
+    def PrintEntry(self):
+        self.lib.PrintTreeEntry(self.tree)
+        
     def RandomQuery(self, width, height):
         boundary_c = (ctypes.c_double * 4)()
         self.lib.GetMBR(self.tree, boundary_c)
         boundary = np.ctypeslib.as_array(boundary_c)
 
+    def PrintSortedLocs(self):
+        self.lib.PrintSortedSplitLocs(self.tree)
 
+    def GetActualSplitFromSortedPos(self, pos):
+        split_loc = self.lib.GetActualSplitLocFromSortedPos(self.tree, self.ptr, pos)
+        split_dim = self.lib.GetActualSplitDimFromSortedPos(self.tree, self.ptr, pos)
+        return split_dim, split_loc
 
     def SetInsertStrategy(self, strategy):
         self.insert_strategy = strategy
