@@ -313,11 +313,14 @@ class SplitLearner:
         self.network.eval()
         self.ResetObjLoader()
         self.tree.Clear()
+        self.reference_tree.Clear()
         object_boundary = self.NextObj()
         obj_cnt = 0
         while object_boundary is not None:
             obj_cnt += 1
             self.tree.DirectInsert(object_boundary)
+            self.reference_tree.DefaultInsert(object_boundary)
+            states = None
             if self.config.network == 'spl_loc':
                 states = self.tree.RetrieveSpecialSplitStates()
             elif self.config.network == 'spl_loc_short':
@@ -328,8 +331,9 @@ class SplitLearner:
                 states = torch.tensor(states, dtype=torch.float32)
                 q_values = self.network(states)
                 action = torch.argmax(q_values).item()
+                action = 0
                 if self.config.network == 'sort_spl_loc':
-                    self.tree.SplitWithSortedLoc(action)
+                    success = self.tree.SplitWithSortedLoc(action)
                 else:
                     self.tree.SplitWithLoc(action)
                 if self.config.network == 'spl_loc':
@@ -347,13 +351,17 @@ class SplitLearner:
         query_num = 0
         query = self.NextQuery()
         f = open('debug.result.log', 'w')
+        f2 = open('reference.result.log', 'w')
         while query is not None:
             node_access += self.tree.Query(query)
             f.write('{}\n'.format(self.tree.QueryResult()))
+            self.reference_tree.Query(query)
+            f2.write('{}\n'.format(self.reference_tree.QueryResult()))
             query_num += 1
             query = self.NextQuery()
         print('average node access is ', node_access / query_num)
         f.close()
+        f2.close()
         return 1.0 * node_access / query_num
 
     def Test(self):
@@ -506,9 +514,8 @@ class SplitLearner:
                     while states is not None:
                         trigger_split = True
                         states = torch.tensor(states, dtype=torch.float32)
-                        action = 0
+                        action = None
                         if self.config.teacher_forcing is not None:
-                            
                             # use teacher forcing
                             splits_with_tf = int(self.config.teacher_forcing * objects_for_train)
                             if training_id < splits_with_tf:
@@ -517,8 +524,8 @@ class SplitLearner:
                                 for i in range(self.config.action_space):
                                     perimeters[i] = states[i * 5 + 2] + states[i * 5 + 3]
                                 perimeters = torch.tensor(perimeters, dtype=torch.float32)
-                                action = np.argmin(margin_perimeters)
-                        else:
+                                action = np.argmin(perimeters)
+                        if action == None:
                             with torch.no_grad():
                                 q_values = self.network(states)
                                 action = self.EpsilonGreedy(q_values)

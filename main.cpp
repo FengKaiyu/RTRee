@@ -8,6 +8,7 @@ using std::ifstream;
 using std::ofstream;
 using std::rand;
 using std::stringstream;
+using std::cout;
 
 void DataLoader(vector<Rectangle>& rectangles) {
 	rectangles.resize(10000);
@@ -35,47 +36,30 @@ void TestBaseline(int insert_strategy, int split_strategy) {
 	SetDefaultInsertStrategy(tree, insert_strategy);
 	SetDefaultSplitStrategy(tree, split_strategy);
 	int total_access = 0;
+	ifstream ifs("./dataset/skew100k.txt", std::ifstream::in);
+	for (int i = 0; i < 100000; i++) {
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
 		Rectangle* rectangle = InsertRec(tree, l, r, b, t);
 		//srand(time(NULL));
 		//int split_strategy = rand() % 5;
 		//SetDefaultSplitStrategy(tree, split_strategy);
-		
 		DefaultInsert(tree, rectangle);
-		//TreeNode* node = RRInsert(tree, rectangle);
-
-		//DirectSplit(tree, node);
-		//RRSplit(tree, node);
 	}
-	cout<<"average node area: "<<AverageNodeArea(tree)<<endl;
-	cout<<"average node entry_num: "<<AverageNodeChildren(tree)<<endl;
-	cout<<"total tree node num: "<<TotalTreeNode(tree)<<endl;
 	ifs.close();
-	ifs.open("d:\\projects\\RLRTree\\dataset\\query1k.txt", std::ifstream::in);
-	vector<Rectangle> rectangles;
-	DataLoader(rectangles);
-	ofstream ofs("verify.txt", std::ofstream::out);
+	ifs.open("./dataset/query1k.txt", std::ifstream::in);
 	for (int i = 0; i < 1000; i++) {
 		//cout<<"query "<<i<<endl;
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
 		Rectangle query(l, r, b, t);
-		tree->Query(query);
-		int result = tree->result_count;
-		int verify_result = tree->VerifyQuery(query);
-		int verify_result2 = NaiveVerifier(rectangles, query);
-		if (result != verify_result || result != verify_result2) {
-			cout << "wrong answer: " << result << " " << verify_result << endl;
-		}
-			ofs << "query " << i << " l: " << l << " r: " << r << " b: " << b << " t: " << t << endl;
-			ofs << result << " " << verify_result << " " << verify_result2 << endl;
-
-		//}
+		int access = QueryRectangle(tree, l, r, b, t);
+		total_access += access;
 	}
-	ofs.close();
 	ifs.close();
 	Clear(tree);
+	cout << "insert strategy " << tree->insert_strategy_ << " split strategy " << tree->split_strategy_ << endl;
+	cout << "average node access is " << 1.0 * total_access / 1000 << endl;
 }
 
 int main() {

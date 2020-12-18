@@ -171,7 +171,7 @@ public:
 	double RR_ys;
 
 	vector<TreeNode*> tmp_sorted_children;
-	vector<pair<double, int> > sorted_split_loc;
+	vector<pair<double, pair<bool, int> > > sorted_split_loc;
 
 
 public:
