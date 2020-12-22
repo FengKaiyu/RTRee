@@ -308,6 +308,58 @@ class SplitLearner:
             self.ResetQueryLoader()
         print('average node access is ', node_access / query_num)
 
+    def Test3(self):
+        self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
+        self.network.eval()
+        self.ResetObjLoader()
+        self.tree.Clear()
+        self.reference_tree.Clear()
+        object_boundary = self.NextObj()
+        obj_cnt = 0
+        count = [0] * 4
+        while object_boundary is not None:
+            obj_cnt += 1
+            self.tree.DirectInsert(object_boundary)
+            self.reference_tree.DefaultInsert(object_boundary)
+
+            if self.tree.NeedSplit():
+                while True:    
+                    num_of_zero_ovlp_splits = self.tree.GetNumberOfNonOverlapSplitLocs()
+                    if num_of_zero_ovlp_splits == None:
+                        break
+                    if num_of_zero_ovlp_splits <= 1:
+                        self.tree.SplitInMinOverlap()
+                    else:
+                        states = self.tree.RetrieveZeroOVLPSplitSortedByPerimeterState()
+                        states = torch.tensor(states, dtype=torch.float32)
+                        q_values = self.network(states)
+                        action = torch.argmax(q_values).item()
+                        self.tree.SplitWithCandidateAction(action)
+            object_boundary = self.NextObj()
+        print(count)
+        #self.tree.PrintEntryNum()
+        print('average tree node area: ', self.tree.AverageNodeArea())
+        print('average tree node children: ', self.tree.AverageNodeChildren())
+        print('total tree nodes: ', self.tree.TotalTreeNodeNum())
+        node_access = 0
+        query_num = 0
+        query = self.NextQuery()
+        f = open('debug.result.log', 'w')
+        f2 = open('reference.result.log', 'w')
+        reference_node_access = 0.0
+        while query is not None:
+            node_access += self.tree.Query(query)
+            f.write('{}\n'.format(self.tree.QueryResult()))
+            reference_node_access += self.reference_tree.Query(query)
+            f2.write('{}\n'.format(self.reference_tree.QueryResult()))
+            query_num += 1
+            query = self.NextQuery()
+        print('average node access is ', node_access / query_num)
+        print('reference node access is ', reference_node_access/query_num)
+        f.close()
+        f2.close()
+        return 1.0 * node_access / query_num
+
     def Test2(self):
         self.network.load_state_dict(torch.load("./model/"+self.config.model_name+".mdl"))
         self.network.eval()
@@ -1186,7 +1238,7 @@ if __name__ == '__main__':
     if args.action == 'test':
         spl_learner = SplitLearner()
         spl_learner.Initialize(args)
-        spl_learner.Test2()
+        spl_learner.Test3()
     if args.action == 'test10':
         spl_learner = SplitLearner()
         spl_learner.Initialize(args)
