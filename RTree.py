@@ -40,6 +40,15 @@ class RTree:
         self.lib.IsLeaf.argtypes = [ctypes.c_void_p]
         self.lib.IsLeaf.restype = ctypes.c_int
 
+        self.lib.GetNumberOfNonOverlapSplitLocs.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.lib.GetNumberOfNonOverlapSplitLocs.restype = ctypes.c_int
+
+        self.lib.SplitInMinOverlap.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.lib.SplitInMinOverlap.restype = ctypes.c_void_p
+
+        self.lib.SplitWithCandidateAction.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+        self.lib.SplitWithCandidateAction.restype = ctypes.c_void_p
+
         self.lib.PrintTreeEntry.argtypes = [ctypes.c_void_p]
         self.lib.PrintTreeEntry.restype = ctypes.c_void_p
 
@@ -84,6 +93,9 @@ class RTree:
 
         self.lib.RetrieveSortedSplitStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSortedSplitStates.restype = ctypes.c_void_p
+
+        self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+        self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState.restype = ctypes.c_void_p 
 
         self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.GetMBR.restype = ctypes.c_void_p
@@ -176,7 +188,7 @@ class RTree:
 
     def PrintEntry(self):
         self.lib.PrintTreeEntry(self.tree)
-        
+
     def RandomQuery(self, width, height):
         boundary_c = (ctypes.c_double * 4)()
         self.lib.GetMBR(self.tree, boundary_c)
@@ -215,7 +227,11 @@ class RTree:
         self.ptr = self.lib.GetRoot(self.tree)
 
 
-
+    def GetNumberOfNonOverlapSplitLocs(self):
+        if self.lib.IsOverflow(self.ptr) == 0:
+            return None
+        num = self.lib.GetNumberOfNonOverlapSplitLocs(self.tree, self.ptr)
+        return num
 
     def GetNumberOfEnlargedChildren(self):
         if self.lib.IsLeaf(self.ptr):
@@ -249,6 +265,12 @@ class RTree:
         states = np.ctypeslib.as_array(state_c)
         return states
 
+    def NeedSplit(self):
+        if self.lib.IsOverflow(self.ptr) == 1:
+            return True
+        else:
+            return False
+
     def RetrieveShortSplitStates(self):
         is_overflow = self.lib.IsOverflow(self.ptr)
         if is_overflow == 0:
@@ -256,6 +278,13 @@ class RTree:
         state_length = 5 * 12
         state_c = (ctypes.c_double * state_length)()
         self.lib.RetrieveShortSplitStates(self.tree, self.ptr, state_c)
+        states = np.ctypeslib.as_array(state_c)
+        return states
+
+    def RetrieveZeroOVLPSplitSortedByPerimeterState(self):
+        state_length = 4 * 2
+        state_c = (ctypes.c_double * state_length)()
+        self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState(self.tree, self.ptr, state_c)
         states = np.ctypeslib.as_array(state_c)
         return states
 
@@ -362,6 +391,19 @@ class RTree:
         self.lib.RetrieveSortedInsertStates(self.tree, self.ptr, self.rec, action_space, rl_type, state_c)
         states = np.ctypeslib.as_array(state_c)
         return states
+
+
+
+    def SplitInMinOverlap(self):
+        self.next_ptr = self.lib.SplitInMinOverlap(self.tree, self.ptr)
+        self.ptr = self.next_ptr
+
+    def SplitWithCandidateAction(self, loc):
+        self.next_ptr = self.lib.SplitWithCandidateAction(self.tree, self.ptr, loc)
+        self.ptr = self.next_ptr
+
+
+        
 
     def UniformRandomQuery(self, wr, hr):
         boundary_c = (ctypes.c_double * 4)()

@@ -149,6 +149,16 @@ struct Stats {
 	void TakeAction(int action);
 };
 
+struct SplitLocation{
+	double perimeter1;
+	double perimeter2;
+	double area1;
+	double area2;
+	double overlap;
+	int location;
+	int dimension; //0 x-low, 1, y-low, 2, x-high, 3, y-high
+};
+
 class RTree {
 public:
     //list<TreeNode*> tree_nodes_;
@@ -175,6 +185,8 @@ public:
 
 	vector<TreeNode*> tmp_sorted_children;
 	vector<pair<double, pair<bool, int> > > sorted_split_loc;
+	vector<SplitLocation> split_locations;
+	vector<int> candidate_split_action;
 
 public:
 
@@ -200,9 +212,12 @@ public:
     TreeNode* SplitStepByStep(TreeNode* tree_node);
 
 	TreeNode* SplitInLoc(TreeNode* tree_node, int loc);
+	TreeNode* SplitInLoc(TreeNode* tree_node, int loc, int dim);
+	TreeNode* SplitWithCandidateAction(TreeNode* tree_node, int loc);
 	TreeNode* InsertInLoc(TreeNode* tree_node, int loc, Rectangle* rec);
 	TreeNode* InsertInSortedLoc(TreeNode* tree_node, int sorted_loc, Rectangle* rec);
 	TreeNode* SplitInSortedLoc(TreeNode* tree_node, int sorted_loc);
+	void PrepareSplitLocations(TreeNode* tree_node);
 
 
 
@@ -273,6 +288,8 @@ extern "C"{
 
 	void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, int topk, int state_type, double* states);
 	void RetrieveSortedSplitStates(RTree* tree, TreeNode* tree_node, int topk, double* states);
+	void RetrieveZeroOVLPSplitSortedByPerimeterState(RTree* tree, TreeNode* tree_noe, double* states);
+	
 	RTree* ConstructTree(int max_entry, int min_entry);
 
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
@@ -285,6 +302,8 @@ extern "C"{
 	int GetMinOverlapIncrementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 
 	int GetNumberOfEnlargedChildren(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
+
+	int GetNumberOfNonOverlapSplitLocs(RTree* rtree, TreeNode* tree_node);
 
 	int GetQueryResult(RTree* rtree);
 	
@@ -308,6 +327,8 @@ extern "C"{
 	TreeNode* InsertWithSortedLoc(RTree* tree, TreeNode* tree_node, int sorted_loc, Rectangle* rec);
 	TreeNode* SplitWithSortedLoc(RTree* rtree, TreeNode* node, int sorted_loc);
 
+	TreeNode* SplitInMinOverlap(RTree* rtree, TreeNode* tree_node);
+
 	int GetActualSplitLocFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc);
 	int GetActualSplitDimFromSortedPos(RTree* rtree, TreeNode* node, int sorted_loc);
 	void PrintSortedSplitLocs(RTree* rtree);
@@ -326,6 +347,8 @@ extern "C"{
 	TreeNode* SplitOneStep(RTree* rtree, TreeNode* node, int strategy);
 
 	TreeNode* SplitWithLoc(RTree* rtree, TreeNode* node, int loc);
+
+	TreeNode* SplitWithCandidateAction(RTree* rtree, TreeNode* node, int loc);
 
 	void PrintTreeEntry(RTree* rtree);
 
