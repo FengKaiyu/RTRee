@@ -316,6 +316,7 @@ class SplitLearner:
         self.reference_tree.Clear()
         object_boundary = self.NextObj()
         obj_cnt = 0
+        count = [0] * 4
         while object_boundary is not None:
             obj_cnt += 1
             self.tree.DirectInsert(object_boundary)
@@ -331,6 +332,7 @@ class SplitLearner:
                 states = torch.tensor(states, dtype=torch.float32)
                 q_values = self.network(states)
                 action = torch.argmax(q_values).item()
+                count[action] += 1
                 if self.config.network == 'sort_spl_loc':
                     success = self.tree.SplitWithSortedLoc(action)
                 else:
@@ -342,6 +344,7 @@ class SplitLearner:
                 elif self.config.network == 'sort_spl_loc':
                     states = self.tree.RetrieveSortedSplitStates(self.config.action_space)
             object_boundary = self.NextObj()
+        print(count)
         #self.tree.PrintEntryNum()
         print('average tree node area: ', self.tree.AverageNodeArea())
         print('average tree node children: ', self.tree.AverageNodeChildren())
@@ -438,6 +441,159 @@ class SplitLearner:
             query = self.NextQuery()
         return 1.0 * node_access / query_num
 
+
+    def Train6(self):
+        #If there are at most 1 split location that causes zero-overlap children, we select the one with the min overlap.
+        #If there are at least two split locations that cause zero-overlap children, we sort by perimeter and retrieve top-2 to construct the state
+        self.config.state_dim = 8
+        self.config.inter_dim = 8
+        self.config.action_space = 2
+        start_time = time.time()
+        loss_log = open("./log/{}.loss".format(self.id), 'w')
+        reward_log = open("./log/{}.reward".format(self.id), "w")
+        steps = []
+        object_num = 0
+        self.ResetObjLoader()
+        object_boundary = self.NextObj()
+        cache_tree = RTree(self.config.max_entry, int(0.4 * self.config.max_entry))
+        cache_tree.SetInsertStrategy(self.config.default_ins_strategy)
+        cache_tree.SetSplitStrategy(self.config.default_spl_strategy)
+
+        while object_boundary is not None:
+            object_num += 1
+            object_boundary = self.NextObj()
+        for epoch in trange(self.config.epoch, desc='Epoch'):
+            e = 0
+            part_trange = trange(self.config.parts, desc='With parts')
+            for part in part_trange:
+                ratio_for_tree_construction = 1.0 * (part + 1) / (self.config.parts + 1)
+                self.ResetObjLoader()
+                self.tree.Clear()
+                self.reference_tree.Clear()
+                cache_tree.Clear()
+                for i in range(int(object_num * ratio_for_tree_construction)):
+                    object_boundary = self.NextObj()
+                    self.tree.DefaultInsert(object_boundary)
+#                print('{} nodes are added into the tree'.format(int(object_num * ratio_for_tree_construction)))
+                part_trange.set_description('With parts: {} nodes are added into the tree'.format(int(object_num * ratio_for_tree_construction)))
+                part_trange.refresh()
+
+                fo = open('train_object.tmp', 'w')
+                object_boundary = self.NextObj()
+                #print('filling leaf nodes')
+                objects_for_fill = 0
+                objects_for_train = 0
+                cnt = 0
+                while object_boundary is not None:
+                    cnt += 1
+                    is_success = self.tree.TryInsert(object_boundary)
+                    if not is_success:
+                        objects_for_train += 1
+                        fo.write('{:.5f} {:.5f} {:.5f} {:.5f}\n'.format(object_boundary[0], object_boundary[1], object_boundary[2], object_boundary[3]))
+                    else:
+                        objects_for_fill += 1
+                    object_boundary = self.NextObj()
+                fo.close()
+                cache_tree.CopyTree(self.tree.tree)
+                self.reference_tree.CopyTree(cache_tree.tree)
+                self.tree.CopyTree(cache_tree.tree)
+
+ 
+                fin = open('train_object.tmp', 'r')
+                period = 0
+                obj_list_for_reward = []
+                accum_loss = 0
+                accum_loss_cnt = 0
+                split_trange = trange(objects_for_train, desc="Training", leave=False)
+                for training_id in split_trange:
+                    line = fin.readline()
+                    object_boundary = [float(v) for v in line.strip().split()]
+                    self.reference_tree.DefaultInsert(object_boundary)
+                    self.tree.DirectInsert(object_boundary)
+                    triggered = False
+                    if self.tree.NeedSplit():
+                        triggered = True
+                        enter_loop = False
+                        while True:    
+                            num_of_zero_ovlp_splits = self.tree.GetNumberOfNonOverlapSplitLocs()
+                            if num_of_zero_ovlp_splits == None:
+                                break
+                            if num_of_zero_ovlp_splits <= 1:
+                                self.tree.SplitInMinOverlap()
+                                if enter_loop:
+                                    steps.append((None, None))
+                                    enter_loop = False
+                            else:
+                                enter_loop = True
+                                states = self.tree.RetrieveZeroOVLPSplitSortedByPerimeterState()
+                                states = torch.tensor(states, dtype=torch.float32)
+                                action = None
+                                if self.config.teacher_forcing is not None:
+                                    splits_with_tf = int(self.config.teacher_forcing * objects_for_train)
+                                    if training_id < splits_with_tf:
+                                        min_perimeter = 100000000000000
+                                        perimeters = np.zeros(self.config.action_space)
+                                        for i in range(self.config.action_space):
+                                            perimeters[i] = states[i*4 + 2] + states[i * 4 + 3]
+                                        perimeters = torch.tensor(perimeters, dtype=torch.float32)
+                                        action = np.argmin(perimeters)
+                                if action == None:
+                                    with torch.no_grad():
+                                        q_values = self.network(states)
+                                        action = self.EpsilonGreedy(q_values)
+                                self.tree.SplitWithCandidateAction(action)
+                                steps.append((states, action))
+                    if triggered and len(steps) > 0 and steps[-1] != (None, None):
+                        steps.append((None, None))
+                    period += 1
+                    obj_list_for_reward.append(object_boundary)
+
+                    if period == self.config.splits_for_update:
+                        reward = self.ComputeDenseRewardForList(obj_list_for_reward)
+                        reward_log.write('{}\n'.format(reward))
+                        for i in range(len(steps) - 1):
+                            if steps[i][1] is None:
+                                continue
+                            self.memory.push(steps[i][0], steps[i][1], torch.tensor([reward]), steps[i+1][0])
+                        self.reference_tree.CopyTree(cache_tree.tree)
+                        self.tree.CopyTree(cache_tree.tree)
+                        period = 0
+                        obj_list_for_reward.clear()
+                        steps.clear()
+                    
+                    l = self.Optimize()
+                    if l is not None:
+                        accum_loss += l
+                        accum_loss_cnt += 1
+                    loss_log.write('{}\n'.format(l))
+                    if e % 500 == 0:
+                        average_loss = None
+                        if accum_loss > 0:
+                            average_loss = 1.0 * accum_loss / accum_loss_cnt
+                        split_trange.set_description('Training: average loss {}'.format(average_loss))
+                        accum_loss = 0
+                        accum_loss_cnt = 0
+                        split_trange.refresh()
+                        self.config.epsilon = max(self.config.epsilon * self.config.epsilon_decay, self.config.min_epsilon)
+                    e += 1
+                    if e % self.config.target_update == 0:
+                        self.target_network.load_state_dict(self.network.state_dict())
+                fin.close()
+            torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.epoch{}'.format(epoch) + '.mdl')
+        end_time = time.time()
+        torch.save(self.network.state_dict(), "./model/"+self.config.model_name+'.'+self.id+'.mdl')
+        reward_log.close()
+        loss_log.close()
+        train_log = open('./log/train.log', 'a')
+        train_log.write('{}:\n'.format(datetime.now()))
+        train_log.write('{}\n'.format(self.id))
+        train_log.write('{}\n'.format(self.config))
+        train_log.write('training time: {}\n'.format(end_time-start_time))
+        #train_log.write('zero reward: {}, zero reward2: {}\n'.format(reward_is_0, reward2_is_0))
+        train_log.close()
+        self.tree.Clear()
+        self.reference_tree.Clear()
+        cache_tree.Clear()
 
     def Train5(self):
         #with teacher forcing
@@ -1026,7 +1182,7 @@ if __name__ == '__main__':
     if args.action == 'train':
         spl_learner = SplitLearner()
         spl_learner.Initialize(args)
-        spl_learner.Train5()
+        spl_learner.Train6()
     if args.action == 'test':
         spl_learner = SplitLearner()
         spl_learner.Initialize(args)
