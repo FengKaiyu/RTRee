@@ -316,7 +316,7 @@ class SplitLearner:
         self.reference_tree.Clear()
         object_boundary = self.NextObj()
         obj_cnt = 0
-        count = [0] * 4
+        count = [0] * 2
         while object_boundary is not None:
             obj_cnt += 1
             self.tree.DirectInsert(object_boundary)
@@ -329,12 +329,14 @@ class SplitLearner:
                         break
                     if num_of_zero_ovlp_splits <= 1:
                         self.tree.SplitInMinOverlap()
+                        count[0] += 1
                     else:
                         states = self.tree.RetrieveZeroOVLPSplitSortedByPerimeterState()
                         states = torch.tensor(states, dtype=torch.float32)
                         q_values = self.network(states)
                         action = torch.argmax(q_values).item()
                         self.tree.SplitWithCandidateAction(action)
+                        count[1] += 1
             object_boundary = self.NextObj()
         print(count)
         #self.tree.PrintEntryNum()
