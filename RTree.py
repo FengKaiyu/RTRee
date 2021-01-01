@@ -140,6 +140,12 @@ class RTree:
         self.lib.DirectInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         self.lib.DirectInsert.restype = ctypes.c_void_p
 
+        self.lib.RRInsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.lib.RRInsert.restype = ctypes.c_void_p
+
+        self.lib.RRSplit.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.lib.RRSplit.restype = ctypes.c_void_p
+
         self.lib.DirectSplit.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         self.lib.DirectSplit.restype = ctypes.c_void_p
 
@@ -545,6 +551,11 @@ class RTree:
         self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
         self.ptr = self.lib.DirectInsert(self.tree, self.rec)
 
+    def DirectRRInsert(self, boundary):
+        self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
+        self.ptr = self.lib.RRInsert(self.tree, self.rec)
+
+
     def RandomDirectInsert(self, boundary):
         self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
         while not self.lib.IsLeaf(self.ptr):
@@ -563,6 +574,9 @@ class RTree:
     def DirectSplit(self):
         self.lib.DirectSplit(self.tree, self.ptr)
 
+    def DirectRRSplit(self):
+        self.lib.RRSplit(self.tree, self.ptr)
+
     def GetNodeBoundary(self):
         boundary_c = (ctypes.c_double * 4)()
         self.lib.GetNodeBoundary(self.ptr, boundary_c)
@@ -577,42 +591,10 @@ if __name__ == '__main__':
     ts = [2.0,8.0,4.0,10.0,7.0,11.0,7.0,3.0,5.0,4.0,11.0,12.0]
 
     tree = RTree(3, 1)
-    tree.SetInsertStrategy('INS_AREA')
-    tree.SetSplitStrategy('SPL_MIN_AREA')
-    loc = 0
     for i in range(len(ls)):
-        #tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
-        tree.PrepareRectangle(ls[i], rs[i], bs[i], ts[i])
-        num = tree.GetNumberOfEnlargedChildren()
-        print('rectangle', ls[i], rs[i], bs[i], ts[i])
-        tree.Print()
-        print(num, 'children are enlarged')
-
-        states = tree.RetrieveSortedInsertStates(1, 0)
-        print('type 0 top 1 state', states)
-        states = tree.RetrieveSortedInsertStates(1, 1)
-        print('type 1 top 1 state', states)
-        states = tree.RetrieveSortedInsertStates(2, 0)
-        print('type 0 top 2 state', states)
-        states = tree.RetrieveSortedInsertStates(2, 1)
-        print('type 1 top 2 state', states)
-        while states is not None:
-            tree.InsertWithSortedLoc(loc)
-            loc = 1 - loc
-            states = tree.RetrieveSortedInsertStates(1, 0)
-            print('type 0 top 1 state', states)
-            states = tree.RetrieveSortedInsertStates(1, 1)
-            print('type 1 top 1 state', states)
-            states = tree.RetrieveSortedInsertStates(2, 0)
-            print('type 0 top 2 state', states)
-            states = tree.RetrieveSortedInsertStates(2, 1)
-            print('type 1 top 2 state', states)
-        input()
-        tree.InsertWithLoc(0)
-        
-        input()
-
-        tree.DefaultSplit()
+        tree.DirectRRInsert((ls[i], rs[i], bs[i], ts[i]))
+        tree.DirectRRSplit()
+    
 
     
     

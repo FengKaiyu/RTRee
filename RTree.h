@@ -65,7 +65,7 @@ public:
 	unsigned int id_;
 
 public:
-    Rectangle(){};
+	Rectangle();
 	Rectangle(const Rectangle& rectangle);
 	Rectangle(double l, double r, double b, double t) :left_(l), right_(r), top_(t), bottom_(b) {};
 
@@ -79,8 +79,10 @@ public:
 
 	bool Contains(const Rectangle* rec);
 	bool IsOverlap(Rectangle* rec);
+	bool IsValid();
 
     void Set(const Rectangle& rectangle);
+	void Set(double l, double r, double b, double t);
     void Include(const Rectangle& rectangle);
 	Rectangle Merge(const Rectangle& rectangle);
 };
@@ -123,6 +125,7 @@ public:
 
     static int maximum_entry;
     static int minimum_entry;
+	static double RR_s;
 
 public:
     TreeNode();
@@ -373,6 +376,8 @@ extern "C"{
 	
 
 	void Clear(RTree* rtree);
+
+	void SetRR_s(double s_value);
 }
 
 

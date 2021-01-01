@@ -7,7 +7,14 @@
 
 int TreeNode::maximum_entry = 100;
 int TreeNode::minimum_entry = 40;
+double TreeNode::RR_s = 0.5;
 
+Rectangle::Rectangle() {
+	left_ = 1;
+	right_ = -1;
+	bottom_ = 1;
+	top_ = -1;
+}
 
 Rectangle::Rectangle(const Rectangle& rectangle) {
 	left_ = rectangle.Left();
@@ -40,9 +47,37 @@ void Rectangle::Set(const Rectangle &rectangle) {
 	top_ = rectangle.Top();
 }
 
+void Rectangle::Set(double l, double r, double b, double t) {
+	left_ = l;
+	right_ = r;
+	bottom_ = b;
+	top_ = t;
+}
+
+bool Rectangle::IsValid() {
+	if (right_ >= left_ && top_ >= bottom_) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 
 Rectangle Merge(const Rectangle& rectangle1, const Rectangle& rectangle2) {
 	return Rectangle(min(rectangle1.Left(), rectangle2.Left()), max(rectangle1.Right(), rectangle2.Right()), min(rectangle1.Bottom(), rectangle2.Bottom()), max(rectangle1.Top(), rectangle2.Top()));
+}
+
+Rectangle Overlap(const Rectangle& rectangle1, const Rectangle& rectangle2) {
+	Rectangle ovlp;
+	double left = max(rectangle1.left_, rectangle2.left_);
+	double right = min(rectangle1.right_, rectangle2.right_);
+	double bottom = max(rectangle1.bottom_, rectangle2.bottom_);
+	double top = min(rectangle1.top_, rectangle2.top_);
+	if (left < right && bottom < top) {
+		ovlp.Set(left, right, bottom, top);
+	}
+	return ovlp;
 }
 
 void Stats::Reset() {
@@ -51,6 +86,7 @@ void Stats::Reset() {
 		action_history[i] = 0;
 	}
 }
+
 
 void Stats::TakeAction(int action) {
 	action_history[action] += 1;
@@ -1049,6 +1085,228 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc) {
 	return next_node;
 }
 
+double RR_wf(int i, double y1, double ys, double miu, double delta) {
+	double xi = 2.0 * i / (TreeNode::maximum_entry + 1) - 1;
+	double wf = ys * (exp(0 - (xi - miu) * (xi - miu) / delta / delta) - y1);
+	return wf;
+}
+
+TreeNode* RTree::RRSplit(TreeNode* tree_node) {
+	TreeNode* next_node = nullptr;
+	if (tree_node->is_overflow) {
+		double new_center[2] = { 0.5 * (tree_node->Right() + tree_node->Left()), 0.5 * (tree_node->Top() + tree_node->Bottom()) };
+		double length[2] = { tree_node->Right() - tree_node->Left(), tree_node->Top() - tree_node->Bottom() };
+
+		Rectangle bounding_box1;
+		Rectangle bounding_box2;
+		vector<int> new_child1;
+		vector<int> new_child2;
+		double perim_max = 2 * (length[0] + length[1]) - min(length[0], length[1]);
+		double y1 = exp(-1.0 / TreeNode::RR_s / TreeNode::RR_s);
+		double ys = 1.0 / (1.0 - y1);
+		double min_w = DBL_MAX;
+		int split_dim, split_loc;
+		if (tree_node->is_leaf) {
+			vector<Rectangle*> children(tree_node->entry_num);
+			for (int i = 0; i < tree_node->entry_num; i++) {
+				children[i] = objects_[tree_node->children[i]];
+			}
+			vector<pair<Rectangle, Rectangle> > splits[2];
+			splits[0].resize(TreeNode::maximum_entry + 2 - 2 * TreeNode::minimum_entry);
+			splits[1].resize(TreeNode::maximum_entry + 2 - 2 * TreeNode::minimum_entry);
+			for (int dim = 0; dim < 2; dim++) {
+				if (dim == 0) {
+					sort(children.begin(), children.end(), SortedByLeft);
+				}
+				else {
+					sort(children.begin(), children.end(), SortedByBottom);
+				}
+				Rectangle prefix = MergeRange<Rectangle>(children, 0, TreeNode::minimum_entry - 1);
+				Rectangle suffix = MergeRange<Rectangle>(children, TreeNode::maximum_entry - TreeNode::minimum_entry + 1, children.size());
+				for (int i = TreeNode::minimum_entry - 1; i < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; i++) {
+					int loc = i - TreeNode::minimum_entry + 1;
+					prefix.Include(*children[i]);
+					splits[dim][loc].first.Set(prefix);
+					splits[dim][loc].second.Set(suffix);
+					for (int j = i + 1; j < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; j++) {
+						splits[dim][loc].second.Include(*children[j]);
+					}
+				}
+			}
+			double perim_sum[2] = { 0.0, 0.0 };
+			for (int dim = 0; dim < 2; dim++) {
+				for (int i = 0; i < splits[dim].size(); i++) {
+					perim_sum[dim] += splits[dim][i].first.Perimeter() + splits[dim][i].second.Perimeter();
+				}
+			}
+			split_dim = perim_sum[0] < perim_sum[1] ? 0 : 1;
+			double asym = 2 * (new_center[split_dim] - tree_node->origin_center[split_dim]) / length[split_dim];
+			double miu = (1 - 2.0 * TreeNode::minimum_entry / (TreeNode::maximum_entry + 1)) * asym;
+			double delta = TreeNode::RR_s * (1 + abs(miu));
+			Rectangle ovlp;
+			for (int i = 0; i < splits[split_dim].size(); i++) {
+				if (splits[split_dim][i].first.IsOverlap(&splits[split_dim][i].second)) {
+					ovlp = Overlap(splits[split_dim][i].first, splits[split_dim][i].second);
+					double wg = ovlp.Area();
+					double wf = RR_wf(i + TreeNode::minimum_entry - 1, y1, ys, miu, delta);
+					double w = wg / wf;
+					if (w < min_w) {
+						min_w = w;
+						split_loc = i + TreeNode::minimum_entry - 1;
+						bounding_box1.Set(splits[split_dim][i].first);
+						bounding_box2.Set(splits[split_dim][i].second);
+					}
+				}
+				else {
+					double wg = splits[split_dim][i].first.Perimeter() + splits[split_dim][i].second.Perimeter() - perim_max;
+					double wf = RR_wf(i + TreeNode::minimum_entry - 1, y1, ys, miu, delta);
+					double w = wg * wf;
+					if (w < min_w) {
+						min_w = w;
+						split_loc = i + TreeNode::minimum_entry - 1;
+						bounding_box1.Set(splits[split_dim][i].first);
+						bounding_box2.Set(splits[split_dim][i].second);
+					}
+				}
+			}
+			if (split_dim == 0) {
+				sort(children.begin(), children.end(), SortedByLeft);
+			}
+			else {
+				sort(children.begin(), children.end(), SortedByBottom);
+			}
+			new_child1.resize(split_loc + 1);
+			new_child2.resize(tree_node->entry_num - split_loc - 1);
+			for (int i = 0; i <= split_loc; i++) {
+				new_child1[i] = children[i]->id_;
+			}
+			for (int i = split_loc + 1; i < children.size(); i++) {
+				new_child2[i - split_loc - 1] = children[i]->id_;
+			}
+		}
+		else {
+			vector<TreeNode*> children(tree_node->entry_num);
+			for (int i = 0; i < tree_node->entry_num; i++) {
+				children[i] = tree_nodes_[tree_node->children[i]];
+			}
+
+			vector<pair<Rectangle, Rectangle> > splits(TreeNode::maximum_entry + 2 - 2 * TreeNode::minimum_entry);
+			
+			for (int dim = 0; dim < 2; dim++) {
+				//processing each dimension in turn.
+				double asym = 2 * (new_center[dim] - tree_node->origin_center[dim]) / length[dim];
+				double miu = (1 - 2.0 * TreeNode::minimum_entry / (TreeNode::maximum_entry + 1)) * asym;
+				double delta = TreeNode::RR_s * (1 + abs(miu));
+				if (dim == 0) {
+					sort(children.begin(), children.end(), SortedByLeft);
+				}
+				else {
+					sort(children.begin(), children.end(), SortedByBottom);
+				}
+				Rectangle prefix = MergeRange<TreeNode>(children, 0, TreeNode::minimum_entry - 1);
+				Rectangle suffix = MergeRange<TreeNode>(children, TreeNode::maximum_entry - TreeNode::minimum_entry + 1, children.size());
+				for (int i = TreeNode::minimum_entry - 1; i < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; i++) {
+					int loc = i - TreeNode::minimum_entry + 1;
+					prefix.Include(*children[i]);
+					splits[loc].first.Set(prefix);
+					splits[loc].second.Set(suffix);
+					for (int j = i + 1; j < TreeNode::maximum_entry - TreeNode::minimum_entry + 1; j++) {
+						splits[loc].second.Include(*children[j]);
+					}
+				}
+				Rectangle ovlp;
+				for (int i = 0; i < splits.size(); i++) {
+					if (splits[i].first.IsOverlap(&splits[i].second)) {
+						ovlp = Overlap(splits[i].first, splits[i].second);
+						double wg = ovlp.Area();
+						double wf = RR_wf(i + TreeNode::minimum_entry - 1, y1, ys, miu, delta);
+						double w = wg / wf;
+						if (w < min_w) {
+							min_w = w;
+							split_dim = dim;
+							split_loc = i + TreeNode::minimum_entry - 1;
+							bounding_box1.Set(splits[i].first);
+							bounding_box2.Set(splits[i].second);
+						}
+					}
+					else {
+						double wg = splits[i].first.Perimeter() + splits[i].second.Perimeter() - perim_max;
+						double wf = RR_wf(i + TreeNode::minimum_entry - 1, y1, ys, miu, delta);
+						double w = wg * wf;
+						if (w < min_w) {
+							min_w = w;
+							split_dim = dim;
+							split_loc = i + TreeNode::minimum_entry - 1;
+							bounding_box1.Set(splits[i].first);
+							bounding_box2.Set(splits[i].second);
+						}
+					}
+				}		 
+			}
+			if (split_dim == 0) {
+				sort(children.begin(), children.end(), SortedByLeft);
+			}
+			else {
+				sort(children.begin(), children.end(), SortedByBottom);
+			}
+			new_child1.resize(split_loc + 1);
+			new_child2.resize(tree_node->entry_num - split_loc - 1);
+			for (int i = 0; i <= split_loc; i++) {
+				new_child1[i] = children[i]->id_;
+			}
+			for (int i = split_loc + 1; i < children.size(); i++) {
+				new_child2[i - split_loc - 1] = children[i]->id_;
+			}
+		}
+		TreeNode* sibling = CreateNode();
+		sibling->is_leaf = tree_node->is_leaf;
+		sibling->CopyChildren(new_child2);
+		if (!sibling->is_leaf) {
+			for (int i = 0; i < new_child2.size(); i++) {
+				tree_nodes_[new_child2[i]]->father = sibling->id_;
+			}
+		}
+		sibling->Set(bounding_box2);
+		sibling->origin_center[0] = 0.5 * (bounding_box2.Left() + bounding_box2.Right());
+		sibling->origin_center[1] = 0.5 * (bounding_box2.Top() + bounding_box2.Bottom());
+
+		tree_node->CopyChildren(new_child1);
+		if (!tree_node->is_leaf) {
+			for (int i = 0; i < new_child1.size(); i++) {
+				tree_nodes_[new_child1[i]]->father = tree_node->id_;
+			}
+		}
+		tree_node->Set(bounding_box1);
+		tree_node->origin_center[0] = 0.5 * (bounding_box1.Left() + bounding_box1.Right());
+		tree_node->origin_center[1] = 0.5 * (bounding_box1.Bottom() + bounding_box1.Top());
+
+		if (tree_node->father >= 0) {
+			tree_nodes_[tree_node->father]->AddChildren(sibling);
+			tree_nodes_[tree_node->father]->Include(bounding_box2);
+			sibling->father = tree_node->father;
+			//tree_node->father->AddChildren(sibling);
+			//tree_node->father->Include(bounding_box2);
+		}
+		else {
+			TreeNode* new_root = CreateNode();
+			new_root->is_leaf = false;
+			new_root->AddChildren(tree_node);
+			new_root->AddChildren(sibling);
+			new_root->Set(bounding_box1);
+			new_root->Include(bounding_box2);
+			root_ = new_root->id_;
+			tree_node->father = new_root->id_;
+			sibling->father = new_root->id_;
+			height_ += 1;
+			new_root->origin_center[0] = 0.5 * (new_root->left_ + new_root->right_);
+			new_root->origin_center[1] = 0.5 * (new_root->bottom_ + new_root->top_);
+		}
+		next_node = tree_nodes_[tree_node->father];
+	}
+	return next_node;
+}
+
+/*
 TreeNode* RTree::RRSplit(TreeNode* tree_node){
 	TreeNode* next_node = nullptr;
 	if(tree_node->is_overflow){
@@ -1183,6 +1441,7 @@ TreeNode* RTree::RRSplit(TreeNode* tree_node){
 	}
 	return next_node;
 }
+*/
 
 
 
@@ -2048,39 +2307,26 @@ TreeNode* RTree::RRInsert(Rectangle* rectangle, TreeNode* tree_node){
 					p = i;
 				}
 			}
-			vector<int> cand;
-			vector<bool> is_in_cand(p+1, false);
-			cand.push_back(0);
-			is_in_cand[0] = true;
-			int idx = 0;
 			vector<double> margin_ovlp_area(p+1, 0);
-			while(idx < cand.size()){
-				int t = cand[idx];
-				for(int j = 0; j <= p; j++){
-					if(j != t)continue;
+			for(int t=0; t<= p; t++){
+				margin_ovlp_area[t] = 0;
+				for(int j=0; j<=p; j++){
+					if(t == j)continue;
 					double ovlp_tj = MarginOvlpArea(tree_nodes_[sequence[t].second], rectangle, tree_nodes_[sequence[j].second]);
 					margin_ovlp_area[t] += ovlp_tj;
-					if(ovlp_tj != 0 && (!is_in_cand[j])){
-						cand.push_back(j);
-						is_in_cand[j] = true;
-					}
 				}
-				idx += 1;
-			}
-			for(int i = cand.size() - 1; i >= 0; i = i - 1){
-				int t = cand[i];
 				if(margin_ovlp_area[t] == 0){
 					next_node = tree_nodes_[sequence[t].second];
 					return next_node;
 				}
 			}
-			int c = cand[0];
-			for(int i = 1; i < cand.size(); i++){
-				if(margin_ovlp_area[sequence[c].second] > margin_ovlp_area[sequence[cand[i]].second]){
-					c = cand[i];
+			double min_ovlp = DBL_MAX;
+			for(int t=0; t<=p; t++){
+				if(margin_ovlp_area[t] < min_ovlp){
+					min_ovlp = margin_ovlp_area[t];
+					next_node = tree_nodes_[sequence[t].second];
 				}
 			}
-			next_node = tree_nodes_[sequence[c].second];
 			return next_node;
 
 		}
@@ -4667,4 +4913,8 @@ TreeNode* SplitInMinOverlap(RTree* rtree, TreeNode* tree_node){
 	}
 	TreeNode* next_node = rtree->SplitInLoc(tree_node, split_loc, split_dim);
 	return next_node;
+}
+
+void SetRR_s(double s_value) {
+	TreeNode::RR_s = s_value;
 }
