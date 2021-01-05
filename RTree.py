@@ -58,6 +58,18 @@ class RTree:
         self.lib.RetrieveStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveStates.restype = ctypes.c_int
 
+        self.lib.GetIndexSizeInMB.argtypes = [ctypes.c_void_p]
+        self.lib.GetIndexSizeInMB.restype = ctypes.c_double
+
+        self.lib.SetStartTimestamp.argtypes = [ctypes.c_void_p]
+        self.lib.SetStartTimestamp.restype = ctypes.c_void_p
+
+        self.lib.SetEndTimestamp.argtypes = [ctypes.c_void_p]
+        self.lib.SetEndTimestamp.restype = ctypes.c_void_p
+
+        self.lib.GetDurationInSeconds.argtypes = [ctypes.c_void_p]
+        self.lib.GetDurationInSeconds.restype = ctypes.c_double
+
         self.lib.RetrieveSpecialStates.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSpecialStates.restype = ctypes.c_void_p
 
@@ -96,6 +108,9 @@ class RTree:
 
         self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState.restype = ctypes.c_void_p 
+
+        self.lib.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
+        self.lib.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState.restype = ctypes.c_void_p
 
         self.lib.GetMBR.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.GetMBR.restype = ctypes.c_void_p
@@ -195,6 +210,18 @@ class RTree:
     def PrintEntry(self):
         self.lib.PrintTreeEntry(self.tree)
 
+    def GetIndexSizeInMB(self):
+        return self.lib.GetIndexSizeInMB(self.tree)
+
+    def SetStartTimestamp(self):
+        self.lib.SetStartTimestamp(self.tree)
+
+    def SetEndTimestamp(self):
+        self.lib.SetEndTimestamp(self.tree)
+
+    def GetDurationInSeconds(self):
+        return self.lib.GetDurationInSeconds(self.tree)
+
     def RandomQuery(self, width, height):
         boundary_c = (ctypes.c_double * 4)()
         self.lib.GetMBR(self.tree, boundary_c)
@@ -291,6 +318,13 @@ class RTree:
         state_length = 4 * 2
         state_c = (ctypes.c_double * state_length)()
         self.lib.RetrieveZeroOVLPSplitSortedByPerimeterState(self.tree, self.ptr, state_c)
+        states = np.ctypeslib.as_array(state_c)
+        return states
+
+    def RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(self):
+        state_length = 4 * 2
+        state_c = (ctypes.c_double * state_length)()
+        self.lib.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(self.tree, self.ptr, state_c)
         states = np.ctypeslib.as_array(state_c)
         return states
 
@@ -592,8 +626,19 @@ if __name__ == '__main__':
 
     tree = RTree(3, 1)
     for i in range(len(ls)):
-        tree.DirectRRInsert((ls[i], rs[i], bs[i], ts[i]))
-        tree.DirectRRSplit()
+        tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
+        if tree.NeedSplit():
+            while True:
+                num_of_zero_ovlp_splits = tree.GetNumberOfNonOverlapSplitLocs()
+                print(num_of_zero_ovlp_splits)
+                if num_of_zero_ovlp_splits == None:
+                    break
+                if num_of_zero_ovlp_splits <= 1:
+                    tree.SplitInMinOverlap()
+                else:
+                    states = tree.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState()
+                    print(states)
+                    tree.SplitWithCandidateAction(0)
     
 
     

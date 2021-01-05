@@ -334,6 +334,8 @@ TreeNode::TreeNode(TreeNode* node) {
 	for (int i = 0; i < entry_num; i++) {
 		children[i] = node->children[i];
 	}
+	origin_center[0] = node->origin_center[0];
+	origin_center[1] = node->origin_center[1];
 	father = node->father;
 	left_ = node->left_;
 	right_ = node->right_;
@@ -626,6 +628,8 @@ void RTree::Recover(RTree* rtree) {
 		int node_id = *it;
 		tree_nodes_[node_id]->Set(*(rtree->tree_nodes_[node_id]));
 		tree_nodes_[node_id]->entry_num = rtree->tree_nodes_[node_id]->entry_num;
+		tree_nodes_[node_id]->origin_center[0] = rtree->tree_nodes_[node_id]->origin_center[0];
+		tree_nodes_[node_id]->origin_center[1] = rtree->tree_nodes_[node_id]->origin_center[1];
 		for (int i = 0; i < tree_nodes_[node_id]->entry_num; i++) {
 			tree_nodes_[node_id]->children[i] = rtree->tree_nodes_[node_id]->children[i];
 			int child = tree_nodes_[node_id]->children[i];
@@ -676,6 +680,8 @@ TreeNode* RTree::InsertInSortedLoc(TreeNode *tree_node, int sorted_loc, Rectangl
 	if(tree_node->is_leaf){
 		if(tree_node->entry_num == 0){
 			tree_node->Set(*rec);
+			tree_node->origin_center[0] = 0.5 * (rec->Right() + rec->Left());
+			tree_node->origin_center[1] = 0.5 * (rec->Bottom() + rec->Top());
 		}
 		else{
 			tree_node->Include(*rec);
@@ -695,6 +701,8 @@ TreeNode* RTree::InsertInLoc(TreeNode *tree_node, int loc, Rectangle *rec){
 		//cout<<"is leaf"<<endl;
 		if(tree_node->entry_num == 0){
 			tree_node->Set(*rec);
+			tree_node->origin_center[0] = 0.5 * (rec->Left() + rec->Right());
+			tree_node->origin_center[1] = 0.5 * (rec->Bottom() + rec->Top());
 		}
 		else{
 			tree_node->Include(*rec);
@@ -785,7 +793,8 @@ TreeNode* RTree::SplitInSortedLoc(TreeNode* tree_node, int sorted_loc){
 		}
 	}
 	sibling->Set(bounding_box2);
-
+	sibling->origin_center[0] = 0.5 * (bounding_box2.Left() + bounding_box2.Right());
+	sibling->origin_center[1] = 0.5 * (bounding_box2.Bottom() + bounding_box2.Top());
 	
 	tree_node->CopyChildren(new_child1);
 	if (!tree_node->is_leaf) {
@@ -794,6 +803,8 @@ TreeNode* RTree::SplitInSortedLoc(TreeNode* tree_node, int sorted_loc){
 		}
 	}
 	tree_node->Set(bounding_box1);
+	tree_node->origin_center[0] = 0.5 * (bounding_box1.Left() + bounding_box1.Right());
+	tree_node->origin_center[1] = 0.5 * (bounding_box1.Bottom() + bounding_box1.Top());
 	if (tree_node->father >= 0) {
 		tree_nodes_[tree_node->father]->AddChildren(sibling);
 		tree_nodes_[tree_node->father]->Include(bounding_box2);
@@ -806,6 +817,8 @@ TreeNode* RTree::SplitInSortedLoc(TreeNode* tree_node, int sorted_loc){
 		new_root->AddChildren(sibling);
 		new_root->Set(bounding_box1);
 		new_root->Include(bounding_box2);
+		new_root->origin_center[0] = 0.5 * (new_root->Left() + new_root->Right());
+		new_root->origin_center[1] = 0.5 * (new_root->Bottom() + new_root->Top());
 		root_ = new_root->id_;
 		tree_node->father = new_root->id_;
 		sibling->father = new_root->id_;
@@ -915,6 +928,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc, int dim){
 		}
 	}
 	sibling->Set(bounding_box2);
+	sibling->origin_center[0] = 0.5 * (sibling->Left() + sibling->Right());
+	sibling->origin_center[1] = 0.5 * (sibling->Top() + sibling->Bottom());
 	tree_node->CopyChildren(new_child1);
 	if (!tree_node->is_leaf) {
 		for (int i = 0; i < new_child1.size(); i++) {
@@ -922,6 +937,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc, int dim){
 		}
 	}
 	tree_node->Set(bounding_box1);
+	tree_node->origin_center[0] = 0.5 * (tree_node->Left() + tree_node->Right());
+	tree_node->origin_center[1] = 0.5 * (tree_node->Bottom() + tree_node->Top());
 	if (tree_node->father >= 0) {
 		tree_nodes_[tree_node->father]->AddChildren(sibling);
 		tree_nodes_[tree_node->father]->Include(bounding_box2);
@@ -934,6 +951,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc, int dim){
 		new_root->AddChildren(sibling);
 		new_root->Set(bounding_box1);
 		new_root->Include(bounding_box2);
+		new_root->origin_center[0] = 0.5 * (new_root->Left() + new_root->Right());
+		new_root->origin_center[1] = 0.5 * (new_root->Bottom() + new_root->Top());
 		root_ = new_root->id_;
 		tree_node->father = new_root->id_;
 		sibling->father = new_root->id_;
@@ -1057,6 +1076,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc) {
 		}
 	}
 	sibling->Set(bounding_box2);
+	sibling->origin_center[0] = 0.5 * (bounding_box2.Left() + bounding_box2.Right());
+	sibling->origin_center[1] = 0.5 * (bounding_box2.Top() + bounding_box2.Bottom());
 	tree_node->CopyChildren(new_child1);
 	if (!tree_node->is_leaf) {
 		for (int i = 0; i < new_child1.size(); i++) {
@@ -1064,6 +1085,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc) {
 		}
 	}
 	tree_node->Set(bounding_box1);
+	tree_node->origin_center[0] = 0.5 * (bounding_box1.Left() + bounding_box1.Right());
+	tree_node->origin_center[1] = 0.5 * (bounding_box1.Bottom() + bounding_box1.Top());
 	if (tree_node->father >= 0) {
 		tree_nodes_[tree_node->father]->AddChildren(sibling);
 		tree_nodes_[tree_node->father]->Include(bounding_box2);
@@ -1076,6 +1099,8 @@ TreeNode* RTree::SplitInLoc(TreeNode* tree_node, int loc) {
 		new_root->AddChildren(sibling);
 		new_root->Set(bounding_box1);
 		new_root->Include(bounding_box2);
+		new_root->origin_center[0] = 0.5 * (new_root->Left() + new_root->Right());
+		new_root->origin_center[1] = 0.5 * (new_root->Bottom() + new_root->Top());
 		root_ = new_root->id_;
 		tree_node->father = new_root->id_;
 		sibling->father = new_root->id_;
@@ -2093,6 +2118,8 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
             }
 		}
 		sibling->Set(bounding_box2);
+		sibling->origin_center[0] = 0.5 * (sibling->Left() + sibling->Right());
+		sibling->origin_center[1] = 0.5 * (sibling->Bottom() + sibling->Top());
 		tree_node->CopyChildren(new_child1);
 		if(!tree_node->is_leaf){
             for (int i = 0; i < new_child1.size(); i++) {
@@ -2101,6 +2128,8 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
             }
 		}
 		tree_node->Set(bounding_box1);
+		tree_node->origin_center[0] = 0.5 * (tree_node->Left() + tree_node->Right());
+		tree_node->origin_center[1] = 0.5 * (tree_node->Bottom() + tree_node->Top());
 		if (tree_node->father >= 0) {
 			tree_nodes_[tree_node->father]->AddChildren(sibling);
 			tree_nodes_[tree_node->father]->Include(bounding_box2);
@@ -2115,6 +2144,8 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 			new_root->AddChildren(sibling);
 			new_root->Set(bounding_box1);
 			new_root->Include(bounding_box2);
+			new_root->origin_center[0] = 0.5 * (new_root->Left() + new_root->Right());
+			new_root->origin_center[1] = 0.5 * (new_root->Bottom() + new_root->Top());
 			root_ = new_root->id_;
 			tree_node->father = new_root->id_;
 			sibling->father = new_root->id_;
@@ -2265,6 +2296,8 @@ TreeNode* RTree::RRInsert(Rectangle* rectangle, TreeNode* tree_node){
 		}
 		if(tree_node->entry_num == 0){
 			tree_node->Set(*rectangle);
+			tree_node->origin_center[0] = 0.5 * (tree_node->Right() + tree_node->Left());
+			tree_node->origin_center[1] = 0.5 * (tree_node->Bottom() + tree_node->Top());
 		}
 		else{
 			tree_node->Include(*rectangle);
@@ -2351,6 +2384,8 @@ TreeNode* RTree::InsertStepByStep(const Rectangle *rectangle, TreeNode *tree_nod
 		//this tree node is a leaf node
 		if (tree_node->entry_num == 0) {
 			tree_node->Set(*rectangle);
+			tree_node->origin_center[0] = 0.5 * (tree_node->Left() + tree_node->Right());
+			tree_node->origin_center[1] = 0.5 * (tree_node->Bottom() + tree_node->Top());
 		}
 		else {
 			tree_node->Include(*rectangle);
@@ -4518,6 +4553,60 @@ void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec
 	}
 }
 
+void RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(RTree* tree, TreeNode* tree_node, double* states){
+	if(tree->candidate_split_action.size() == 0){
+		tree->candidate_split_action.resize(2);
+	}
+	vector<pair<double, int> > zero_ovlp_splits;
+	double length[2] = {tree_node->Right() - tree_node->Left(), tree_node->Top() - tree_node->Bottom()};
+	double center[2] = {0.5 * (tree_node->Left() + tree_node->Right()), 0.5 * (tree_node->Bottom() + tree_node->Top())};
+	cout<<"original center: "<<tree_node->origin_center[0]<<" "<<tree_node->origin_center[1]<<endl;
+	cout<<"new center: "<<center[0]<<" "<<center[1]<<endl;
+	double perim_max = 2 * ( length[0] + length[1]) - min(length[0], length[1]);
+	double asym[2] = {0, 0};
+	double miu[2] = {0, 0};
+	double delta[2] = {0, 0};
+	double s = 0.5;
+	double y1 = exp(-1 / s / s);
+	double ys = 1 / (1 - y1);
+	for(int i=0; i<2; i++){
+		asym[i] = 2 * (center[i] - tree_node->origin_center[i])/length[i];
+		miu[i] = (1 - 2 * TreeNode::minimum_entry/(TreeNode::maximum_entry + 1)) * asym[i];
+		delta[i] = s * (1 + abs(miu[i]));
+	}
+	for(int i=0; i<tree->split_locations.size(); i++){
+		int idx = i % ((TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2) * 2);
+		double xi = 2.0 * idx / (TreeNode::maximum_entry + 1)  - 1;
+		double wf = ys * (exp(0 - (xi - miu[i]) * (xi - miu[i]) / delta[i] / delta[i]) - y1);
+		double wg = tree->split_locations[i].perimeter1 + tree->split_locations[i].perimeter2 - perim_max;
+		zero_ovlp_splits.emplace_back(wg * wf, i);
+		cout<<"wg: "<<wg<<" wf "<<wf<<endl;
+	}
+	sort(zero_ovlp_splits.begin(), zero_ovlp_splits.end());
+	double max_area = -DBL_MAX;
+	double min_area = DBL_MAX;
+	double max_perimeter = -DBL_MAX;
+	double min_perimeter = DBL_MAX;
+
+	for(int i=0; i<2; i++){
+		int idx = zero_ovlp_splits[i].second;
+		tree->candidate_split_action[i] = idx;
+		states[i * 4] = tree->split_locations[idx].area1;
+		states[i * 4 + 1] = tree->split_locations[idx].area2;
+		states[i * 4 + 2] = tree->split_locations[idx].perimeter1;
+		states[i * 4 + 3] = tree->split_locations[idx].perimeter2;
+		max_area = max(max_area, states[i*4]);
+		min_area = min(min_area, states[i*4 + 1]);
+		max_perimeter = max(max_perimeter, states[i*4 + 2]);
+		min_perimeter = min(min_perimeter, states[i*4 + 3]);
+	}
+	for(int i = 0; i<2; i++){
+		states[i * 4] = (states[i * 4] - min_area) / (max_area - min_area + 0.1);
+		states[i * 4 + 1] = (states[i * 4 + 1] - min_area) / (max_area - min_area + 0.1);
+		states[i * 4 + 2] = (states[i * 4 + 2] - min_perimeter) / (max_perimeter - min_perimeter + 0.1);
+		states[i * 4 + 3] = (states[i * 4 + 3] - min_perimeter) / (max_perimeter - min_perimeter + 0.1);
+	}
+}
 
 void RetrieveZeroOVLPSplitSortedByPerimeterState(RTree* tree, TreeNode* tree_noe, double* states){
 	if(tree->candidate_split_action.size() == 0){
@@ -4755,6 +4844,8 @@ int TryInsert(RTree* rtree, Rectangle* rec) {
 			if (iter->entry_num < TreeNode::maximum_entry) {
 				if (iter->entry_num == 0) {
 					iter->Set(*rec);
+					iter->origin_center[0] = 0.5 * (iter->Right() + iter->Left());
+					iter->origin_center[1] = 0.5 * (iter->Bottom() + iter->Top());
 				}
 				else {
 					iter->Include(*rec);
@@ -4888,7 +4979,6 @@ int GetNumberOfEnlargedChildren(RTree* rtree, TreeNode* tree_node, Rectangle* re
 }
 
 int GetNumberOfNonOverlapSplitLocs(RTree* rtree, TreeNode* tree_node){
-	//TODO: return the number of non-overlap split locations
 	rtree->PrepareSplitLocations(tree_node);
 	int non_overlap_split_num = 0;
 	for(int i = 0; i<rtree->split_locations.size(); i++){
@@ -4917,4 +5007,30 @@ TreeNode* SplitInMinOverlap(RTree* rtree, TreeNode* tree_node){
 
 void SetRR_s(double s_value) {
 	TreeNode::RR_s = s_value;
+}
+
+void SetStartTimestamp(RTree* rtree){
+	rtree->start_point = high_resolution_clock::now();
+}
+	
+void SetEndTimestamp(RTree* rtree){
+	rtree->end_point = high_resolution_clock::now();
+}
+
+double GetDurationInSeconds(RTree* rtree){
+	std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double> >(rtree->end_point - rtree->start_point);
+	return time_span.count();
+}
+
+double GetIndexSizeInMB(RTree* rtree){
+	double total_size = 0.0;
+	//space cost of objects
+	total_size += rtree->objects_.size() * (sizeof(double) * 4 + sizeof(int));
+	//space cost of tree nodes
+	for(int i=0; i<rtree->tree_nodes_.size(); i++){
+		TreeNode* node = rtree->tree_nodes_[i];
+		total_size += sizeof(int) * 2  + sizeof(int) * node->entry_num + sizeof(double) * 2 + sizeof(bool) * 2;
+	}
+	total_size = total_size / 1024 / 1024;
+	return total_size;
 }

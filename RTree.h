@@ -9,6 +9,7 @@
 #include<algorithm>
 #include<cfloat>
 #include<cmath>
+#include<chrono>
 #include<assert.h>
 #include<iostream>
 #include<fstream>
@@ -26,7 +27,7 @@ using std::ceil;
 using std::endl;
 using std::exp;
 using std::ofstream;
-
+using std::chrono::high_resolution_clock;
 
 
 enum INSERT_STRATEGY{
@@ -171,6 +172,8 @@ public:
     int root_;
 	int height_;
 	list<int> history;
+	high_resolution_clock::time_point start_point;
+	high_resolution_clock::time_point end_point;
 
     //parameters
     INSERT_STRATEGY insert_strategy_;
@@ -292,7 +295,8 @@ extern "C"{
 	void RetrieveSortedInsertStates(RTree* tree, TreeNode* tree_node, Rectangle* rec, int topk, int state_type, double* states);
 	void RetrieveSortedSplitStates(RTree* tree, TreeNode* tree_node, int topk, double* states);
 	void RetrieveZeroOVLPSplitSortedByPerimeterState(RTree* tree, TreeNode* tree_noe, double* states);
-	
+	void RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(RTree* tree, TreeNode* tree_node, double* states);
+
 	RTree* ConstructTree(int max_entry, int min_entry);
 
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
@@ -354,6 +358,14 @@ extern "C"{
 	TreeNode* SplitWithCandidateAction(RTree* rtree, TreeNode* node, int loc);
 
 	void PrintTreeEntry(RTree* rtree);
+	
+	double GetIndexSizeInMB(RTree* rtree);
+
+	void SetStartTimestamp(RTree* rtree);
+	
+	void SetEndTimestamp(RTree* rtree);
+
+	double GetDurationInSeconds(RTree* rtree);
 
 	int IsLeaf(TreeNode* node);
 	int IsOverflow(TreeNode* node);

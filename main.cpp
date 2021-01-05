@@ -33,11 +33,14 @@ void TestRRStar() {
 	RTree* tree = ConstructTree(50, 20);
 	int total_access = 0;
 	ifstream ifs("./dataset/skew100k.txt", std::ifstream::in);
+	SetDefaultInsertStrategy(tree, 1);
+	SetDefaultSplitStrategy(tree, 1);
 	for (int i = 0; i < 100000; i++) {
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
 		Rectangle* rectangle = InsertRec(tree, l, r, b, t);
-		TreeNode* tree_node = RRInsert(tree, rectangle);
+		TreeNode* tree_node = DirectInsert(tree, rectangle);
+		//TreeNode* tree_node = RRInsert(tree, rectangle);
 		RRSplit(tree, tree_node);
 	}
 	ifs.close();
