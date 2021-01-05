@@ -625,6 +625,7 @@ if __name__ == '__main__':
     ts = [2.0,8.0,4.0,10.0,7.0,11.0,7.0,3.0,5.0,4.0,11.0,12.0]
 
     tree = RTree(3, 1)
+    tree.SetStartTimestamp()
     for i in range(len(ls)):
         tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
         if tree.NeedSplit():
@@ -642,7 +643,9 @@ if __name__ == '__main__':
     
 
     
-    
+    tree.SetEndTimestamp();
+    print(tree.GetDurationInSeconds(), 'seconds')
+    print(tree.GetIndexSizeInMB(), 'MB') 
     l, r, b, t = tree.UniformRandomQuery(2.0, 4.0)
     print(l, r, b, t)
     access = tree.Query((l, r, b, t))
