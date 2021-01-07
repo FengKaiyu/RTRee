@@ -4560,8 +4560,8 @@ void RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(RTree* tree, TreeNode* 
 	vector<pair<double, int> > zero_ovlp_splits;
 	double length[2] = {tree_node->Right() - tree_node->Left(), tree_node->Top() - tree_node->Bottom()};
 	double center[2] = {0.5 * (tree_node->Left() + tree_node->Right()), 0.5 * (tree_node->Bottom() + tree_node->Top())};
-	cout<<"original center: "<<tree_node->origin_center[0]<<" "<<tree_node->origin_center[1]<<endl;
-	cout<<"new center: "<<center[0]<<" "<<center[1]<<endl;
+	//cout<<"original center: "<<tree_node->origin_center[0]<<" "<<tree_node->origin_center[1]<<endl;
+	//cout<<"new center: "<<center[0]<<" "<<center[1]<<endl;
 	double perim_max = 2 * ( length[0] + length[1]) - min(length[0], length[1]);
 	double asym[2] = {0, 0};
 	double miu[2] = {0, 0};
@@ -4575,14 +4575,19 @@ void RetrieveZeroOVLPSplitSortedByWeightedPerimeterState(RTree* tree, TreeNode* 
 		delta[i] = s * (1 + abs(miu[i]));
 	}
 	for(int i=0; i<tree->split_locations.size(); i++){
-		int idx = i % ((TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2) * 2);
-		double xi = 2.0 * idx / (TreeNode::maximum_entry + 1)  - 1;
-		double wf = ys * (exp(0 - (xi - miu[i]) * (xi - miu[i]) / delta[i] / delta[i]) - y1);
+		int idx = i % (TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2);
+		int dim = i / (TreeNode::maximum_entry - 2 * TreeNode::minimum_entry + 2);
+		double xi = 2.0 * (idx + TreeNode::minimum_entry) / (TreeNode::maximum_entry + 1)  - 1;
+		double wf = ys * (exp(0 - (xi - miu[dim]) * (xi - miu[dim]) / delta[dim] / delta[dim]) - y1);
 		double wg = tree->split_locations[i].perimeter1 + tree->split_locations[i].perimeter2 - perim_max;
 		zero_ovlp_splits.emplace_back(wg * wf, i);
-		cout<<"wg: "<<wg<<" wf "<<wf<<endl;
+		//cout<<"loc: "<<idx<<" wg: "<<wg<<" wf "<<wf<<" xi: "<<xi<< " miu: "<<miu[dim]<<endl;
 	}
 	sort(zero_ovlp_splits.begin(), zero_ovlp_splits.end());
+	//for(int i=0; i<zero_ovlp_splits.size(); i++){
+	//	cout<<"("<<zero_ovlp_splits[i].first<<", "<<zero_ovlp_splits[i].second<<") ";
+	//}
+	//cout<<endl;
 	double max_area = -DBL_MAX;
 	double min_area = DBL_MAX;
 	double max_perimeter = -DBL_MAX;
