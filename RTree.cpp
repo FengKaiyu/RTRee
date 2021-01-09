@@ -1468,7 +1468,43 @@ TreeNode* RTree::RRSplit(TreeNode* tree_node){
 }
 */
 
+double RTree::MinDistanceToRec(double x, double y, int rec_id) {
+	Rectangle* rec = objects_[rec_id];
+	double min_distance = 0.0;
+	if (x > rec->right_) {
+		min_distance += (x - rec->right_) * (x - rec->right_);
+	}
+	else if (x < rec->left_) {
+		min_distance += (rec->left_ - x) * (rec->left_ - x);
+	}
+	if (y > rec->top_) {
+		min_distance += (y - rec->top_) * (y - rec->top_);
+	}
+	else if (y < rec->bottom_) {
+		min_distance += (rec->bottom_ - y) * (rec->bottom_ - y);
+	}
+	min_distance = sqrt(min_distance);
+	return min_distance;
+}
 
+double RTree::MinDistanceToNode(double x, double y, int tree_node_id) {
+	TreeNode* tree_node = tree_nodes_[tree_node_id];
+	double min_distance = 0.0;
+	if (x > tree_node->right_) {
+		min_distance += (x - tree_node->right_) * (x - tree_node->right_);
+	}
+	else if (x < tree_node->left_) {
+		min_distance += (tree_node->left_ - x) * (tree_node->left_ - x);
+	}
+	if (y > tree_node->top_) {
+		min_distance += (y - tree_node->top_) * (y - tree_node->top_);
+	}
+	else if (y < tree_node->bottom_) {
+		min_distance += (tree_node->bottom_ - y) * (tree_node->bottom_ - y);
+	}
+	min_distance = sqrt(min_distance);
+	return min_distance;
+}
 
 
 TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
@@ -2160,6 +2196,90 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 
 int GetQueryResult(RTree* rtree) {
 	return rtree->result_count;
+}
+
+int RTree::KNNQuery(double x, double y, int k, vector<int>& query_results){
+	priority_queue < pair<double, int>, vector<pair<double, int> >, std::greater<pair<double, int> > > pqueue;
+	vector<pair<double, int> > results;
+	int access_num = 0;
+	pqueue.emplace(MinDistanceToNode(x, y, root_), root_);
+	vector<pair<double, int> > tmp;
+	while (!pqueue.empty()) {
+		pair<double, int> top = pqueue.top();
+		if (results.size() >= k) {
+			if (top.first > results[k - 1].first) {
+				break;
+			}
+		}
+		access_num += 1;
+		pqueue.pop();
+		TreeNode* node = tree_nodes_[top.second];
+		if (node->is_leaf) {
+			tmp.resize(node->entry_num);
+			for (int i = 0; i < node->entry_num; i++) {
+				int child = node->children[i];
+				double d = MinDistanceToRec(x, y, child);
+				tmp[i].first = d;
+				tmp[i].second = child;
+			}
+			sort(tmp.begin(), tmp.end());
+			int idx_result = 0;
+			int idx_tmp = 0;
+			list<pair<double, int> > topk;
+			while (topk.size() < k) {
+				if (idx_result == results.size() && idx_tmp == tmp.size()) {
+					break;
+				}
+				if (idx_result == results.size()) {
+					topk.push_back(tmp[idx_tmp]);
+					idx_tmp += 1;
+					continue;
+				}
+				if (idx_tmp == tmp.size()) {
+					topk.push_back(results[idx_result]);
+					idx_result += 1;
+					continue;
+				}
+				if (results[idx_result].first < tmp[idx_tmp].first) {
+					topk.push_back(results[idx_result]);
+					idx_result += 1;
+				}
+				else if (results[idx_result].first > tmp[idx_tmp].first) {
+					topk.push_back(tmp[idx_tmp]);
+					idx_tmp += 1;
+				}
+				else {
+					topk.push_back(tmp[idx_tmp]);
+					topk.push_back(results[idx_result]);
+					idx_tmp += 1;
+					idx_result += 1;
+				}
+				
+			}
+			results.assign(topk.begin(), topk.end());
+		}
+		else {
+			for (int i = 0; i < node->entry_num; i++) {
+				int child = node->children[i];
+				double d = MinDistanceToNode(x, y, child);
+				//cout << "distance between query point and node " << child << " is " << d << endl;
+				if (results.size() >= k) {
+					double ub = results[k - 1].first;
+					if (d < ub) {
+						pqueue.emplace(d, child);
+					}
+				}
+				else {
+					pqueue.emplace(d, child);
+				}
+			}
+		}
+	}
+	query_results.resize(k);
+	for (int i = 0; i < results.size(); i++) {
+		query_results[i] = results[i].second;
+	}
+	return access_num;
 }
 
 int RTree::Query(Rectangle& rectangle) {
@@ -4388,6 +4508,30 @@ void SetDefaultSplitStrategy(RTree* rtree, int strategy) {
 		rtree->split_strategy_ = SPL_GREENE;
 	}
 	}
+}
+
+int KNNQuery(RTree* rtree, double x, double y, int k) {
+	vector<int> results;
+	int node_access = rtree->KNNQuery(x, y, k, results);
+	cout << "node_access " << node_access << endl;
+	cout << "KNN query: ";
+	for (int i = 0; i < results.size(); i++) {
+		cout << results[i] << ", ";
+	}
+	cout << endl;
+
+	vector<pair<double, int> > brute(rtree->objects_.size());
+	for (int i = 0; i < rtree->objects_.size(); i++) {
+		brute[i].first = rtree->MinDistanceToRec(x, y, i);
+		brute[i].second = i;
+	}
+	sort(brute.begin(), brute.end());
+	cout << "Brute force: ";
+	for (int i = 0; i < k; i++) {
+		cout << brute[i].second << ", ";
+	}
+	cout << endl;
+	return node_access;
 }
 
 int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top) {

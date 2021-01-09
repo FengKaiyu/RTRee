@@ -12,6 +12,7 @@
 #include<chrono>
 #include<assert.h>
 #include<iostream>
+#include<queue>
 #include<fstream>
 
 using std::list;
@@ -28,7 +29,7 @@ using std::endl;
 using std::exp;
 using std::ofstream;
 using std::chrono::high_resolution_clock;
-
+using std::priority_queue;
 
 enum INSERT_STRATEGY{
     INS_AREA, INS_MARGIN, INS_OVERLAP, INS_RANDOM
@@ -55,6 +56,8 @@ public:
     double get_bottom(){return y;};
     double get_top(){return y;};
 };
+
+
 
 class Rectangle{
 public:
@@ -246,6 +249,9 @@ public:
     void SortChildrenByMarginArea(TreeNode* tree_node, Rectangle* rec);
 	void SortSplitLocByPerimeter(TreeNode* tree_node);
 	int Query(Rectangle& rectangle);
+	int KNNQuery(double x, double y, int k, vector<int>& results);
+	double MinDistanceToNode(double x, double y, int tree_node_id);
+	double MinDistanceToRec(double x, double y, int rec_id);
 	void GetSplitStates(TreeNode* tree_node, double* states);
 	void GetShortSplitStates(TreeNode* tree_node, double* states);
 	void GetInsertStates(TreeNode* tree_node, Rectangle* rec, double* states);
@@ -302,6 +308,7 @@ extern "C"{
 	void SetDefaultInsertStrategy(RTree* rtree, int strategy);
 	void SetDefaultSplitStrategy(RTree* rtree, int strategy);
 	int QueryRectangle(RTree* rtree, double left, double right, double bottom, double top);
+	int KNNQuery(RTree* rtree, double x, double y, int k);
 
 	int GetMinAreaContainingChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);
 	int GetMinAreaEnlargementChild(RTree* rtree, TreeNode* tree_node, Rectangle* rec);

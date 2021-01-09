@@ -85,10 +85,12 @@ void TestBaseline(int insert_strategy, int split_strategy) {
 		//cout<<"query "<<i<<endl;
 		double l, r, b, t;
 		ifs >> l >> r >> b >> t;
-		Rectangle query(l, r, b, t);
-		int access = QueryRectangle(tree, l, r, b, t);
-		ofs << tree->result_count << endl;
-		total_access += access;
+		//Rectangle query(l, r, b, t);
+		//int access = QueryRectangle(tree, l, r, b, t);
+		//ofs << tree->result_count << endl;
+		//total_access += access;
+		KNNQuery(tree, l, b, 10);
+		getchar();
 	}
 	ofs.close();
 	ifs.close();
@@ -98,13 +100,7 @@ void TestBaseline(int insert_strategy, int split_strategy) {
 }
 
 int main() {
-	cout << "test RR* tree" << endl;
-	for (int i = 0; i < 5; i++) {
-		SetRR_s(0.4 + i * 0.05);
-		cout << "using s value" << TreeNode::RR_s << endl;
-		TestRRStar();
-	}
-	cout << "testing R* tree" << endl;
+	
 	TestBaseline(1, 1);
 	return 0;	
 }

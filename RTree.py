@@ -19,6 +19,9 @@ class RTree:
         self.lib.QueryRectangle.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]
         self.lib.QueryRectangle.restype = ctypes.c_int
 
+        self.lib.KNNQuery.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_int]
+        self.lib.KNNQuery.restype = ctypes.c_int
+
         self.lib.GetRoot.argtypes = [ctypes.c_void_p]
         self.lib.GetRoot.restype = ctypes.c_void_p
 
@@ -496,6 +499,11 @@ class RTree:
     def Query(self, boundary):
         node_access = self.lib.QueryRectangle(self.tree, boundary[0], boundary[1], boundary[2], boundary[3])
         return node_access
+
+    def KNNQuery(self, x, y, k):
+        node_access = self.lib.KNNQuery(self.tree, x, y, k)
+        return node_access
+        
     def QueryResult(self):
         return self.lib.GetQueryResult(self.tree)
 

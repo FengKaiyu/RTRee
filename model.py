@@ -579,7 +579,7 @@ class SplitLearner:
                                     enter_loop = False
                             else:
                                 enter_loop = True
-                                states = self.tree.RetrieveZeroOVLPSplitSortedByPerimeterState()
+                                states = self.tree.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState()
                                 states = torch.tensor(states, dtype=torch.float32)
                                 action = None
                                 if self.config.teacher_forcing is not None:
