@@ -642,9 +642,9 @@ if __name__ == '__main__':
     tree.SetInsertStrategy('INS_AREA')
     tree.SetStartTimestamp()
     for i in range(len(ls)):
-        #tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
-        #tree.DirectSplitWithReinsert()
-        tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
+        tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
+        tree.DirectSplitWithReinsert()
+        #tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
         #tree.Print()
 
     

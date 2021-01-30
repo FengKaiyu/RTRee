@@ -2298,18 +2298,13 @@ void RTree::RetrieveForReinsert(TreeNode* tree_node, list<int>& candidates) {
 		entries[i].first = sqrt(x_diff * x_diff + y_diff * y_diff);
 	}
 	sort(entries.begin(), entries.end());
-	int retrieve_num = int(tree_node->entry_num * 0.3);
-	retrieve_num = 1;
-	
-	cout << "for retrieving " << endl;
-	cout << "before " << tree_node->left_ << " " << tree_node->right_ << " " << tree_node->top_ << " " << tree_node->bottom_ << endl;
+	int retrieve_num = int(ceil(tree_node->entry_num * 0.3));	
 	tree_node->Set(*objects_[entries[0].second]);
 	tree_node->children.clear();
 	tree_node->entry_num = 0;
 	tree_node->AddChildren(entries[0].second);
 	tree_node->is_overflow = false;
 	for (int i = 1; i < entries.size(); i++) {
-		cout << i << " " << entries.size() - retrieve_num << endl;
 		if (i < entries.size() - retrieve_num) {
 			tree_node->Include(*objects_[entries[i].second]);
 			tree_node->AddChildren(entries[i].second);
@@ -2318,21 +2313,15 @@ void RTree::RetrieveForReinsert(TreeNode* tree_node, list<int>& candidates) {
 			candidates.push_back(entries[i].second);
 		}
 	}
-	cout << "after " << tree_node->left_ << " " << tree_node->right_ << " " << tree_node->top_ << " " << tree_node->bottom_ << endl;
-	Print();
 }
 
 void RTree::UpdateMBRForReinsert(TreeNode* tree_node) {
 	TreeNode* iter = tree_node;
-	while (iter->father >= 0) {
-		cout << "father " << iter->father << " root " << root_ << endl;
+	while (iter->father >= 0) {	
 		iter = tree_nodes_[iter->father];
-		cout << "iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
 		iter->Set(*tree_nodes_[iter->children[0]]);
-		cout << "after set iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
 		for (int i = 1; i < iter->entry_num; i++) {
 			iter->Include(*tree_nodes_[iter->children[i]]);
-			cout << "after include iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
 		}
 	}
 
