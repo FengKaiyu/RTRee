@@ -419,7 +419,7 @@ void RTree::Print() {
 		iter = queue.front();
 		queue.pop_front();
 		cout << "node: [" << iter->left_ << ", " << iter->right_ << ", " << iter->bottom_ << ", " << iter->top_ << "]";
-		cout << " " << iter->entry_num << " children";
+		cout << " " << iter->entry_num << " children, is_overflow: "<<iter->is_overflow;
 		for (int i = 0; i < iter->entry_num; i++) {
 			if (iter->is_leaf) {
 				int child_idx = iter->children[i];
@@ -2146,7 +2146,10 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 		
 		TreeNode* sibling = CreateNode();
 		sibling->is_leaf = tree_node->is_leaf;
-		sibling->CopyChildren(new_child2);
+		if (!sibling->CopyChildren(new_child2)) {
+			cout << "Error" << endl;
+			exit(0);
+		};
 		if(!sibling->is_leaf){
             for (int i = 0; i < new_child2.size(); i++) {
 				tree_nodes_[new_child2[i]]->father = sibling->id_;
@@ -2156,7 +2159,10 @@ TreeNode* RTree::SplitStepByStep(TreeNode *tree_node, SPLIT_STRATEGY strategy) {
 		sibling->Set(bounding_box2);
 		sibling->origin_center[0] = 0.5 * (sibling->Left() + sibling->Right());
 		sibling->origin_center[1] = 0.5 * (sibling->Bottom() + sibling->Top());
-		tree_node->CopyChildren(new_child1);
+		if (!tree_node->CopyChildren(new_child1)) {
+			cout << "Error" << endl;
+			exit(0);
+		};
 		if(!tree_node->is_leaf){
             for (int i = 0; i < new_child1.size(); i++) {
 				tree_nodes_[new_child1[i]]->father = tree_node->id_;
@@ -2280,6 +2286,56 @@ int RTree::KNNQuery(double x, double y, int k, vector<int>& query_results){
 		query_results[i] = results[i].second;
 	}
 	return access_num;
+}
+
+void RTree::RetrieveForReinsert(TreeNode* tree_node, list<int>& candidates) {
+	vector<pair<double, int> > entries(tree_node->entry_num);
+	for (int i = 0; i < tree_node->entry_num; i++) {
+		entries[i].second = tree_node->children[i];
+		Rectangle* rec = objects_[entries[i].second];
+		double x_diff = 0.5 * (rec->left_ + rec->right_) - 0.5 * (tree_node->left_ + tree_node->right_);
+		double y_diff = 0.5 * (rec->top_ + rec->bottom_) - 0.5 * (tree_node->top_ + tree_node->bottom_);
+		entries[i].first = sqrt(x_diff * x_diff + y_diff * y_diff);
+	}
+	sort(entries.begin(), entries.end());
+	int retrieve_num = int(tree_node->entry_num * 0.3);
+	retrieve_num = 1;
+	
+	cout << "for retrieving " << endl;
+	cout << "before " << tree_node->left_ << " " << tree_node->right_ << " " << tree_node->top_ << " " << tree_node->bottom_ << endl;
+	tree_node->Set(*objects_[entries[0].second]);
+	tree_node->children.clear();
+	tree_node->entry_num = 0;
+	tree_node->AddChildren(entries[0].second);
+	tree_node->is_overflow = false;
+	for (int i = 1; i < entries.size(); i++) {
+		cout << i << " " << entries.size() - retrieve_num << endl;
+		if (i < entries.size() - retrieve_num) {
+			tree_node->Include(*objects_[entries[i].second]);
+			tree_node->AddChildren(entries[i].second);
+		}
+		else {
+			candidates.push_back(entries[i].second);
+		}
+	}
+	cout << "after " << tree_node->left_ << " " << tree_node->right_ << " " << tree_node->top_ << " " << tree_node->bottom_ << endl;
+	Print();
+}
+
+void RTree::UpdateMBRForReinsert(TreeNode* tree_node) {
+	TreeNode* iter = tree_node;
+	while (iter->father >= 0) {
+		cout << "father " << iter->father << " root " << root_ << endl;
+		iter = tree_nodes_[iter->father];
+		cout << "iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
+		iter->Set(*tree_nodes_[iter->children[0]]);
+		cout << "after set iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
+		for (int i = 1; i < iter->entry_num; i++) {
+			iter->Include(*tree_nodes_[iter->children[i]]);
+			cout << "after include iter " << iter->left_ << " " << iter->right_ << " " << iter->bottom_ << " " << iter->top_ << endl;
+		}
+	}
+
 }
 
 int RTree::Query(Rectangle& rectangle) {
@@ -4980,6 +5036,19 @@ void DirectSplit(RTree* rtree, TreeNode* node) {
 	while (iter->is_overflow) {
 		iter = rtree->SplitStepByStep(iter);
 	}
+}
+
+void DirectSplitWithReinsert(RTree* rtree, TreeNode* node) {
+	if (node->is_overflow) {
+		list<int> candidates;
+		rtree->RetrieveForReinsert(node, candidates);
+		rtree->UpdateMBRForReinsert(node);
+		for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+			Rectangle* rec = rtree->objects_[*it];
+			DefaultInsert(rtree, rec);
+		}
+	}
+	
 }
 
 int TryInsert(RTree* rtree, Rectangle* rec) {

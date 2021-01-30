@@ -228,7 +228,8 @@ public:
 	TreeNode* SplitInSortedLoc(TreeNode* tree_node, int sorted_loc);
 	void PrepareSplitLocations(TreeNode* tree_node);
 
-
+	void RetrieveForReinsert(TreeNode* tree_node, list<int>& candidates);
+	void UpdateMBRForReinsert(TreeNode* tree_node);  
 
     //Rectangle MergeRectangleList(const vector<pair<double, Rectangle> >& rectangle_list, double min_value);
 
@@ -331,9 +332,7 @@ extern "C"{
 	TreeNode* DirectInsert(RTree* rtree, Rectangle* rec);
 
 	void DirectSplit(RTree* rtree, TreeNode* tree_node);
-
-
-	void DirectSplit(RTree* rtree, TreeNode* node);
+	void DirectSplitWithReinsert(RTree* rtree, TreeNode* tree_node);
 
 	int TryInsert(RTree* rtree, Rectangle* rec);
 

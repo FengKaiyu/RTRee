@@ -91,6 +91,9 @@ class RTree:
         self.lib.RetrieveSpecialInsertStates6.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSpecialInsertStates6.restype = ctypes.c_void_p
         
+        self.lib.DirectSplitWithReinsert.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.lib.DirectSplitWithReinsert.restype = ctypes.c_void_p
+
         self.lib.RetrieveSpecialInsertStates7.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double)]
         self.lib.RetrieveSpecialInsertStates7.restype = ctypes.c_void_p
 
@@ -597,6 +600,8 @@ class RTree:
         self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
         self.ptr = self.lib.RRInsert(self.tree, self.rec)
 
+    def DirectSplitWithReinsert(self):
+        self.lib.DirectSplitWithReinsert(self.tree, self.ptr)
 
     def RandomDirectInsert(self, boundary):
         self.PrepareRectangle(boundary[0], boundary[1], boundary[2], boundary[3])
@@ -632,23 +637,15 @@ if __name__ == '__main__':
     bs = [0.0,6.0,2.0,7.0,4.0,8.0,5.0,1.0,3.0,1.0,9.0,9.0]
     ts = [2.0,8.0,4.0,10.0,7.0,11.0,7.0,3.0,5.0,4.0,11.0,12.0]
 
-    tree = RTree(3, 1)
+    tree = RTree(3, 2)
+    tree.SetSplitStrategy('SPL_MIN_AREA')
+    tree.SetInsertStrategy('INS_AREA')
     tree.SetStartTimestamp()
     for i in range(len(ls)):
-        tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
-        if tree.NeedSplit():
-            while True:
-                num_of_zero_ovlp_splits = tree.GetNumberOfNonOverlapSplitLocs()
-                print(num_of_zero_ovlp_splits)
-                if num_of_zero_ovlp_splits == None:
-                    break
-                if num_of_zero_ovlp_splits <= 1:
-                    tree.SplitInMinOverlap()
-                else:
-                    states = tree.RetrieveZeroOVLPSplitSortedByWeightedPerimeterState()
-                    print(states)
-                    tree.SplitWithCandidateAction(0)
-    
+        #tree.DirectInsert((ls[i], rs[i], bs[i], ts[i]))
+        #tree.DirectSplitWithReinsert()
+        tree.DefaultInsert((ls[i], rs[i], bs[i], ts[i]))
+        #tree.Print()
 
     
     tree.SetEndTimestamp();
